@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ensureLoggedIn, getAccessToken } from '../lib/liff.js';
 import { api } from '../lib/api.js';
 import { PlantPicker } from '../components/PlantPicker.jsx';
+import { StoryModal } from '../components/StoryModal.jsx';
 
 const MESSAGE_LIMIT = 60;
 
@@ -12,6 +13,7 @@ export function PlayPage() {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [storyPlant, setStoryPlant] = useState(null);
 
   useEffect(() => {
     ensureLoggedIn()
@@ -62,7 +64,7 @@ export function PlayPage() {
       <h1>種下日南</h1>
       <p className="play-page__hint">選一株植物，留下一句話，讓它出現在投影牆上。</p>
 
-      <PlantPicker value={plantType} onChange={setPlantType} />
+      <PlantPicker value={plantType} onChange={setPlantType} onReadStory={setStoryPlant} />
 
       <label className="play-page__message-label">
         留一句話（{message.length}/{MESSAGE_LIMIT}）
@@ -79,6 +81,8 @@ export function PlayPage() {
       <button type="submit" disabled={submitting || !plantType}>
         {submitting ? '送出中…' : '種下'}
       </button>
+
+      <StoryModal plant={storyPlant} onClose={() => setStoryPlant(null)} />
     </form>
   );
 }
