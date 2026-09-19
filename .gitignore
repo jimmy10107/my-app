@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Environment secrets (never commit real keys)
+.env
+!.env.example
+
+# rinan/ lock files are npm-generated; regenerate with `npm install`
+rinan/**/package-lock.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
