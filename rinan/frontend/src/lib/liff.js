@@ -26,6 +26,11 @@ export function getAccessToken() {
   return liff.getAccessToken();
 }
 
+export async function getProfile() {
+  await initLiff();
+  return liff.getProfile();
+}
+
 export function isInClient() {
   return liff.isInClient();
 }

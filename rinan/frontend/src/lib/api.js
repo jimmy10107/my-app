@@ -32,4 +32,6 @@ export const api = {
   rejectPlanting: (id, token) => request(`/api/plantings/${id}/reject`, { method: 'POST', token }),
 
   visitStats: (token) => request('/api/visits/stats', { token }),
+
+  lineUserStats: (token) => request('/api/line-users/stats', { token }),
 };

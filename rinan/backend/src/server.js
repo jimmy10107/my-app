@@ -5,6 +5,7 @@ import { healthRouter } from './routes/health.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { plantingsRouter } from './routes/plantings.routes.js';
 import { visitsRouter } from './routes/visits.routes.js';
+import { lineUsersRouter } from './routes/lineUsers.routes.js';
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/plantings', plantingsRouter);
 app.use('/api/visits', visitsRouter);
+app.use('/api/line-users', lineUsersRouter);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

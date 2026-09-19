@@ -63,6 +63,12 @@ textarea {
 }
 
 /* Play */
+.play-page__greeting {
+  margin: 0;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .play-page__hint {
   color: #5a5a4a;
 }
@@ -278,6 +284,12 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.admin-page__section-title {
+  font-size: 0.9rem;
+  color: #5a5a4a;
+  margin: 0.5rem 0 -0.25rem;
 }
 
 .admin-page__stats {

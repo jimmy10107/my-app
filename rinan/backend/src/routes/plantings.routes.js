@@ -52,6 +52,15 @@ plantingsRouter.post('/', async (req, res) => {
     return res.status(500).json({ error: '寫入失敗，請稍後再試' });
   }
 
+  // 以 LINE userId 去重留存：新使用者建立一列，舊使用者更新最近參與時間與次數。
+  const { error: touchError } = await supabaseAdmin.rpc('touch_line_user', {
+    p_user_id: profile.userId,
+    p_display_name: profile.displayName,
+  });
+  if (touchError) {
+    console.error('touch_line_user failed', touchError);
+  }
+
   res.status(201).json({
     planting: data,
     notice: '已送出，等待現場人工審核通過後會出現在投影牆上',

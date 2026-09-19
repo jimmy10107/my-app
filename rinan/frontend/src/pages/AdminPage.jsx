@@ -62,18 +62,21 @@ function LoginForm({ onLoggedIn }) {
 function Dashboard({ token, onLogout }) {
   const [pending, setPending] = useState([]);
   const [stats, setStats] = useState(null);
+  const [lineStats, setLineStats] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function refresh() {
     setError(null);
     try {
-      const [{ plantings }, statsData] = await Promise.all([
+      const [{ plantings }, statsData, lineStatsData] = await Promise.all([
         api.pendingPlantings(token),
         api.visitStats(token),
+        api.lineUserStats(token),
       ]);
       setPending(plantings);
       setStats(statsData);
+      setLineStats(lineStatsData);
     } catch (err) {
       if (err.message.includes('過期') || err.message.includes('登入')) {
         onLogout();
@@ -125,6 +128,26 @@ function Dashboard({ token, onLogout }) {
             <span>待審核</span>
           </div>
         </section>
+      )}
+
+      {lineStats && (
+        <>
+          <h2 className="admin-page__section-title">LINE 使用者（去重留存）</h2>
+          <section className="admin-page__stats">
+            <div>
+              <span className="admin-page__stat-value">{lineStats.total}</span>
+              <span>累積不重複人數</span>
+            </div>
+            <div>
+              <span className="admin-page__stat-value">{lineStats.newToday}</span>
+              <span>今日新朋友</span>
+            </div>
+            <div>
+              <span className="admin-page__stat-value">{lineStats.returning}</span>
+              <span>回訪人數</span>
+            </div>
+          </section>
+        </>
       )}
 
       {error && <p className="page__error">{error}</p>}

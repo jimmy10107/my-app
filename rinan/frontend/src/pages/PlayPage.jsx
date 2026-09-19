@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ensureLoggedIn, getAccessToken } from '../lib/liff.js';
+import { ensureLoggedIn, getAccessToken, getProfile } from '../lib/liff.js';
 import { api } from '../lib/api.js';
 import { PlantPicker } from '../components/PlantPicker.jsx';
 import { StoryModal } from '../components/StoryModal.jsx';
@@ -14,10 +14,17 @@ export function PlayPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [storyPlant, setStoryPlant] = useState(null);
+  const [displayName, setDisplayName] = useState(null);
 
   useEffect(() => {
     ensureLoggedIn()
-      .then(() => setReady(true))
+      .then(() => {
+        setReady(true);
+        // 暱稱只用於畫面問候語，不影響送出流程；拿不到也不擋主要功能。
+        getProfile()
+          .then((profile) => setDisplayName(profile.displayName))
+          .catch(() => {});
+      })
       .catch((err) => setError(err.message || 'LINE 登入失敗，請重新整理頁面再試一次'));
   }, []);
 
@@ -62,6 +69,7 @@ export function PlayPage() {
   return (
     <form className="page play-page" onSubmit={handleSubmit}>
       <h1>種下日南</h1>
+      {displayName && <p className="play-page__greeting">哈囉，{displayName}！</p>}
       <p className="play-page__hint">選一株植物，留下一句話，讓它出現在投影牆上。</p>
 
       <PlantPicker value={plantType} onChange={setPlantType} onReadStory={setStoryPlant} />
