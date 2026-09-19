@@ -27,25 +27,38 @@ function trunk(height, radiusTop, radiusBottom, color) {
 }
 
 function leafShape(width, length) {
+  // 寬圓的葉片輪廓（最寬處在葉柄與葉尖中間偏後），適合芋頭／構樹這類闊葉。
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
-  shape.quadraticCurveTo(width, length * 0.3, 0, length);
-  shape.quadraticCurveTo(-width, length * 0.3, 0, 0);
+  shape.quadraticCurveTo(width, length * 0.42, 0, length);
+  shape.quadraticCurveTo(-width, length * 0.42, 0, 0);
   return shape;
+}
+
+// 建一片「攤平躺著、葉柄在原點、葉尖朝 -Z 延伸」的葉片幾何體，
+// 這樣之後只要用 pivot.rotation.y 決定葉片朝哪個水平方向長、
+// 再用 leaf.rotation.x 決定下垂幅度，兩個旋轉互不干擾、好預測。
+function flatLeafGeometry(width, length, depth = 0.012) {
+  const geo = new THREE.ExtrudeGeometry(leafShape(width, length), { depth, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2);
+  return geo;
 }
 
 function leafMeshGroup(count, baseHeight, width, length, color, opts = {}) {
   const group = new THREE.Group();
-  const droop = opts.droop ?? 0.35;
+  const droop = opts.droop ?? 0.4;
   for (let i = 0; i < count; i += 1) {
-    const geo = new THREE.ExtrudeGeometry(leafShape(width, length), { depth: 0.015, bevelEnabled: false });
-    const leaf = mesh(geo, color, { roughness: 0.6 });
-    const angle = (i / count) * Math.PI * 2 + i * 0.9;
-    leaf.position.set(0, baseHeight, 0);
-    leaf.rotation.y = angle;
-    leaf.rotation.x = -Math.PI / 2 + droop + (Math.sin(i * 3.1) * 0.12);
+    const pivot = new THREE.Group();
+    pivot.position.set(0, baseHeight, 0);
+    pivot.rotation.y = (i / count) * Math.PI * 2 + i * 0.9;
+
+    const geo = flatLeafGeometry(width, length);
+    const leaf = mesh(geo, color, { roughness: 0.55 });
+    // 負角度讓葉尖（-Z 那端）往下垂，角度越大垂得越低（凋萎階段用大角度）。
+    leaf.rotation.x = -(droop + Math.abs(Math.sin(i * 2.3)) * 0.12);
     leaf.scale.setScalar(0.85 + (i % 3) * 0.08);
-    group.add(leaf);
+    pivot.add(leaf);
+    group.add(pivot);
   }
   return group;
 }
@@ -75,19 +88,25 @@ function canopyCluster(lobeCount, radius, height, color, opts = {}) {
   return group;
 }
 
+// 木麻黃細長下垂的針葉束：每一束針葉都是「從樹幹上一點往外、往下垂」，
+// 跟葉片用同一種 pivot 技巧（先攤平沿 -Z 延伸，再用 rotation.y 決定水平方向、
+// rotation.x 決定下垂幅度），才會像真的從枝條垂下來，而不是亂飛的碎片。
 function needleTiers(tiers, baseHeight, tierGap, needlesPerTier, needleLength, color) {
   const group = new THREE.Group();
   for (let t = 0; t < tiers; t += 1) {
     const y = baseHeight + t * tierGap;
-    const spread = 0.14 + t * 0.02;
     for (let i = 0; i < needlesPerTier; i += 1) {
-      const geo = new THREE.ConeGeometry(0.012, needleLength, 4);
+      const pivot = new THREE.Group();
+      pivot.position.set(0, y, 0);
+      pivot.rotation.y = (i / needlesPerTier) * Math.PI * 2 + t * 0.7;
+
+      const geo = new THREE.ConeGeometry(0.01, needleLength, 4);
+      geo.translate(0, needleLength / 2, 0); // 錐底（粗端）移到原點，錐尖朝 +Y 延伸
+      geo.rotateX(-Math.PI / 2); // 攤平，錐尖改朝 -Z 延伸
       const needle = mesh(geo, color, { roughness: 0.9 });
-      const angle = (i / needlesPerTier) * Math.PI * 2 + t * 0.7;
-      needle.position.set(Math.cos(angle) * spread, y, Math.sin(angle) * spread);
-      needle.rotation.z = Math.cos(angle) * 1.1 + Math.PI;
-      needle.rotation.x = Math.sin(angle) * 1.1;
-      group.add(needle);
+      needle.rotation.x = -0.55; // 往下垂
+      pivot.add(needle);
+      group.add(pivot);
     }
   }
   return group;
@@ -136,7 +155,9 @@ const BUILDERS = {
       g.add(trunk(0.18, 0.006, 0.01, c));
     } else if (stage === 1) {
       g.add(trunk(0.42, 0.008, 0.012, c));
-      g.add(canopyCluster(3, 0.05, 0.4, c));
+      const tip = grassBlades(3, 0.12, 0.012, c, { lean: 0.2 });
+      tip.position.y = 0.4;
+      g.add(tip);
     } else if (stage === 2) {
       g.add(trunk(0.6, 0.008, 0.014, colors[1]));
       const head = grassBlades(0, 0, 0, c); // placeholder group anchor
@@ -168,11 +189,12 @@ const BUILDERS = {
     const c = colors[stage];
     const counts = [1, 2, 4, 3];
     const heights = [0.14, 0.26, 0.42, 0.34];
-    const widths = [0.05, 0.08, 0.13, 0.11];
-    const lengths = [0.1, 0.16, 0.24, 0.2];
-    const droop = stage === 3 ? 0.75 : 0.3;
+    // 芋頭葉近似盾形（寬≈長的8成），才會讀成「大雨傘葉」而不是一片細長刀葉。
+    const widths = [0.08, 0.12, 0.18, 0.15];
+    const lengths = [0.1, 0.15, 0.22, 0.19];
+    const droops = [0.15, 0.3, 0.42, 0.95];
     g.add(trunk(heights[stage], 0.01, 0.014, colors[1]));
-    g.add(leafMeshGroup(counts[stage], heights[stage], widths[stage], lengths[stage], c, { droop }));
+    g.add(leafMeshGroup(counts[stage], heights[stage], widths[stage], lengths[stage], c, { droop: droops[stage] }));
     return g;
   },
 
@@ -213,11 +235,12 @@ const BUILDERS = {
     const c = colors[stage];
     const counts = [1, 3, 6, 4];
     const heights = [0.12, 0.22, 0.36, 0.3];
-    const widths = [0.04, 0.06, 0.09, 0.08];
-    const lengths = [0.08, 0.13, 0.18, 0.15];
-    const droop = stage === 3 ? 0.7 : 0.25;
+    // 構樹葉偏橢圓，比芋頭窄一些。
+    const widths = [0.05, 0.07, 0.1, 0.09];
+    const lengths = [0.08, 0.12, 0.17, 0.15];
+    const droops = [0.15, 0.28, 0.38, 0.85];
     g.add(trunk(heights[stage], 0.008, 0.012, '#6b5a3f'));
-    g.add(leafMeshGroup(counts[stage], heights[stage], widths[stage], lengths[stage], c, { droop }));
+    g.add(leafMeshGroup(counts[stage], heights[stage], widths[stage], lengths[stage], c, { droop: droops[stage] }));
     if (stage === 2) {
       for (let i = 0; i < 10; i += 1) {
         const berry = mesh(new THREE.SphereGeometry(0.014, 5, 4), '#c0503f', { roughness: 0.35, metalness: 0.1 });
