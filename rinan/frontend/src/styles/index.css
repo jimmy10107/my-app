@@ -365,9 +365,9 @@ textarea {
 .closeup-viewer {
   position: relative;
   margin: -1.6rem -1.4rem 1rem;
-  height: 42vh;
-  min-height: 220px;
-  max-height: 320px;
+  height: 46vh;
+  min-height: 240px;
+  max-height: 360px;
   border-radius: 24px 24px 0 0;
   overflow: hidden;
   background: radial-gradient(ellipse 120% 90% at 50% 15%, #2f2820, #15110d 75%);
@@ -379,20 +379,40 @@ textarea {
   }
 }
 
+/* 底部滑桿實際高度（含 padding／說明文字）約 3.5rem，畫布跟靜態圖都要扣掉
+   這一塊，不然模型／圖片下緣會被滑桿蓋到。 */
 .closeup-viewer canvas {
   width: 100%;
-  height: 100%;
+  height: calc(100% - 3.6rem);
   display: block;
   touch-action: none;
 }
 
-.closeup-viewer__still {
+.closeup-viewer__stills {
   position: absolute;
   inset: 0;
+  transition: opacity 500ms ease;
+}
+
+.closeup-viewer__stills.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.closeup-viewer__still {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 3.6rem);
   object-fit: contain;
-  object-position: 50% 60%;
+  object-position: 50% 55%;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+.closeup-viewer__still.is-active {
+  opacity: 1;
 }
 
 .closeup-viewer__introbar {

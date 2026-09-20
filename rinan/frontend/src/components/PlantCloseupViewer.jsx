@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { CloseupScene, preloadGltf } from '../three/closeupScene.js';
 import { closeupStagesFor } from '../lib/closeupModels.js';
 
-const FRAME_MS = 900; // flipbook 逐格間隔，等待期間持續循環播放
-const MIN_INTRO_MS = 6000; // 至少播完一輪完整生長歷程，不管模型多快載完
-const MAX_INTRO_MS = 24000; // 保底上限：真的卡住也不能讓使用者永遠卡在動畫
+const FRAME_MS = 2400; // flipbook 逐格間隔，放慢到有「定格欣賞」的感受，而不是一閃而過
+const MAX_INTRO_MS = 26000; // 保底上限：真的卡住也不能讓使用者永遠卡在動畫
 const ZONE_COUNT = 4;
 const DEFAULT_SLIDER = 60; // 落在「盛開」區間，動畫結束後預設看的形態
 
@@ -37,6 +36,9 @@ export function PlantCloseupViewer({ plantId }) {
     setSliderValue(DEFAULT_SLIDER);
     setActiveZone(zoneForSlider(DEFAULT_SLIDER));
 
+    // 至少完整播完一輪生長歷程（絲滑淡入淡出、每格都定格欣賞一下）才會結束，
+    // 就算模型早就載完也不提前切斷；真的卡住則靠 MAX_INTRO_MS 保底。
+    const minIntroMs = stages.length * FRAME_MS;
     const startedAt = Date.now();
     const loadAll = Promise.all(stages.map((stage) => preloadGltf(stage.file).catch(() => null)));
 
@@ -54,7 +56,7 @@ export function PlantCloseupViewer({ plantId }) {
 
     loadAll.then(() => {
       const elapsed = Date.now() - startedAt;
-      const remaining = Math.max(0, MIN_INTRO_MS - elapsed);
+      const remaining = Math.max(0, minIntroMs - elapsed);
       settleTimer = setTimeout(finishIntro, remaining);
     });
     const hardCap = setTimeout(finishIntro, MAX_INTRO_MS);
@@ -74,12 +76,13 @@ export function PlantCloseupViewer({ plantId }) {
     const wrap = wrapRef.current;
     const scene = new CloseupScene(canvas);
     sceneRef.current = scene;
-    scene.resize(wrap.clientWidth, wrap.clientHeight);
+    // 用 canvas 自己的 clientHeight（CSS 已經扣掉底部滑桿高度），
+    // 不要用整個 wrapper 的高度，避免內部渲染解析度跟實際顯示尺寸對不上而變形。
+    const syncSize = () => scene.resize(canvas.clientWidth, canvas.clientHeight);
+    syncSize();
     scene.start();
 
-    const resizeObserver = new ResizeObserver(() => {
-      scene.resize(wrap.clientWidth, wrap.clientHeight);
-    });
+    const resizeObserver = new ResizeObserver(syncSize);
     resizeObserver.observe(wrap);
 
     return () => {
@@ -124,12 +127,22 @@ export function PlantCloseupViewer({ plantId }) {
   }
 
   const showStill = phase === 'intro' || modelStatus !== 'ready';
-  const stillSrc = phase === 'intro' ? stages[introFrame].still : stages[activeZone].still;
+  const activeStillIndex = phase === 'intro' ? introFrame : activeZone;
 
   return (
     <div className="closeup-viewer" ref={wrapRef}>
       <canvas ref={canvasRef} style={{ visibility: phase === 'ready' ? 'visible' : 'hidden' }} />
-      {showStill && <img className="closeup-viewer__still" src={stillSrc} alt="" />}
+      {/* 四張圖疊在一起用 opacity 交叉淡入淡出，絲滑無縫接軌，不是直接切換 src 的硬切。 */}
+      <div className={`closeup-viewer__stills${showStill ? '' : ' is-hidden'}`}>
+        {stages.map((s, i) => (
+          <img
+            key={s.slot}
+            src={s.still}
+            alt=""
+            className={`closeup-viewer__still${i === activeStillIndex ? ' is-active' : ''}`}
+          />
+        ))}
+      </div>
 
       {phase === 'intro' && (
         <div className="closeup-viewer__introbar">
