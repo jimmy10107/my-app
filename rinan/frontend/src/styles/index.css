@@ -1,9 +1,12 @@
+/* 色彩對應日南稻站 CIS 品牌識別系統 v1.0：日南炭墨／米紙白／海線藍／站點橙。
+   --accent 沿用田埂綠作為 CIS 允許的單一次色（VI 色彩比例章節）。 */
 :root {
-  --ink: #2b2b22;
-  --paper: #f6f2e7;
+  --ink: #231f20;
+  --paper: #f6f2e8;
   --accent: #6b8f3f;
   --line: #d8d0b8;
-  --gold: #e3b873;
+  --blue: #456c90;
+  --gold: #d99531;
   font-family: 'Noto Sans TC', system-ui, sans-serif;
 }
 
@@ -172,7 +175,7 @@ textarea {
   width: 100vw;
   height: 100vh;
   padding: 0;
-  background: radial-gradient(ellipse 90% 70% at 50% 20%, #1b232b, #0a0d10 75%);
+  background: radial-gradient(ellipse 90% 70% at 50% 20%, #2f2820, #15110d 75%);
   color: #ede6d6;
   display: flex;
   flex-direction: column;
@@ -225,8 +228,8 @@ textarea {
 .message-cloud {
   flex: 0 0 15%;
   min-height: 64px;
-  background: #14181a;
-  border-top: 1px solid #262e26;
+  background: #1a1611;
+  border-top: 1px solid #332c22;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -355,6 +358,45 @@ textarea {
   color: #a9a396;
   padding: 0;
   font-size: 0.85rem;
+}
+
+/* 讀故事彈窗頂部的真實 3D 特寫模型（取代生長牆上的低多邊形示意版），
+   用負邊界貼齊卡片邊緣，跟卡片圓角一起走。 */
+.closeup-viewer {
+  position: relative;
+  margin: -1.6rem -1.4rem 1rem;
+  height: 42vh;
+  min-height: 220px;
+  max-height: 320px;
+  border-radius: 24px 24px 0 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse 120% 90% at 50% 15%, #2f2820, #15110d 75%);
+}
+
+@media (min-width: 640px) {
+  .closeup-viewer {
+    border-radius: 24px 24px 0 0;
+  }
+}
+
+.closeup-viewer canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.closeup-viewer__hint,
+.closeup-viewer__tag {
+  position: absolute;
+  left: 0.9rem;
+  bottom: 0.7rem;
+  font-size: 0.72rem;
+  color: #d8d0b8;
+  background: rgba(10, 13, 16, 0.55);
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  pointer-events: none;
 }
 
 .story-head {

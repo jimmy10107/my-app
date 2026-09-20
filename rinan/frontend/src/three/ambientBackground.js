@@ -1,14 +1,15 @@
-// 投影牆背景氛圍：緩緩漂浮的色塊＋風／水流線＋微光粒子，取自展覽識別色（CIS），
-// 畫在一張 canvas 上再設成 scene.background，取代原本純黑背景，避免畫面太暗沉、
-// 也讓 Wall 頁與現場其他視覺（海報、標題色）呼應。
+// 投影牆背景氛圍：改用日南稻站官方 CIS 色票（見 CIS 品牌識別系統設計規範 v1.0）
+// 日南炭墨 #231F20、海線藍 #456C90、站點橙 #D99531、米紙白 #F6F2E8，
+// 而不是隨意挑的色塊。畫面語彙直接取自 CIS 的「地圖 icon」與「動態」規範：
+// 站點用橙色圓點、路徑用海線藍，動態則是「橙點沿藍線移動、停留、返回」——
+// 剛好呼應場內導覽地圖的視覺語言，也符合「橙色只能當標點，不能當背景主色」的原則。
 import * as THREE from 'three';
 
-const PALETTE = ['#6f93a8', '#a98bc7', '#c17a54', '#8d97a3', '#e08a3c', '#e3b873', '#8fae6f', '#5c9c86', '#d98a75'];
-
-function seededRand(seed) {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
+const INK = '#231F20';
+const INK_LIGHT = '#2f2820';
+const PAPER = '#F6F2E8';
+const BLUE = '#456C90';
+const ORANGE = '#D99531';
 
 function hexToRgba(hex, a) {
   const v = hex.replace('#', '');
@@ -18,102 +19,103 @@ function hexToRgba(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+function seededRand(seed) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
 class AmbientPainter {
   constructor() {
-    this.blobs = Array.from({ length: 9 }, (_, i) => ({
-      color: PALETTE[i % PALETTE.length],
-      anchorX: 0.2 + seededRand(i * 13.1) * 0.6,
-      anchorY: 0.15 + seededRand(i * 17.7) * 0.5,
-      ampX: 0.22 + seededRand(i * 3.3) * 0.22,
-      ampY: 0.18 + seededRand(i * 5.9) * 0.2,
-      freqX: 0.11 + seededRand(i * 2.2) * 0.13,
-      freqY: 0.09 + seededRand(i * 4.4) * 0.13,
-      phase: seededRand(i * 8.8) * 20,
-      baseR: 0.09 + seededRand(i * 6.6) * 0.07,
-      rFreq: 0.3 + seededRand(i * 1.1) * 0.4,
+    // 三條緩緩漂移的海線藍路徑，弧度與相位各自錯開，呼應「往返」路線意象。
+    this.routes = [0, 1, 2].map((i) => ({
+      baseY: 0.22 + i * 0.26,
+      amp: 0.05 + i * 0.015,
+      freq: 0.55 + i * 0.18,
+      phase: i * 2.1,
+      driftSpeed: 0.00003 + i * 0.000008,
     }));
-    this.flowLines = [0, 1, 2, 3].map((i) => ({
-      baseY: 0.18 + i * 0.22,
-      amp: 0.045 + i * 0.008,
-      freq: 1.4 + i * 0.3,
-      speed: 0.00006 + i * 0.00002,
-      phase: i * 1.7,
-      color: '#7fa8a0',
+
+    // 每條路線上一個橙點：沿路徑來回移動、在端點自然停留（sin 波形本身在極值處速度為零）。
+    this.stations = this.routes.map((route, i) => ({
+      route,
+      speed: 0.00011 + seededRand(i * 4.7) * 0.00004,
+      phase: seededRand(i * 9.3) * Math.PI * 2,
+      range: 0.72 + seededRand(i * 2.1) * 0.2,
     }));
-    this.particles = Array.from({ length: 30 }, (_, i) => ({
+
+    this.particles = Array.from({ length: 16 }, (_, i) => ({
       x: seededRand(i * 7.1),
       y: 1 + seededRand(i * 3.3) * 0.3,
-      speed: 0.00008 + seededRand(i * 5.5) * 0.00009,
-      drift: (seededRand(i * 9.2) - 0.5) * 0.15,
-      size: 1 + seededRand(i * 2.1) * 2,
+      speed: 0.00007 + seededRand(i * 5.5) * 0.00006,
+      drift: (seededRand(i * 9.2) - 0.5) * 0.1,
+      size: 0.8 + seededRand(i * 2.1) * 1.6,
       phase: seededRand(i * 4.4) * 10,
     }));
+  }
+
+  _routeY(route, xFrac, W, H, timeMs) {
+    return (
+      route.baseY * H +
+      Math.sin(xFrac * Math.PI * 2 * route.freq + timeMs * route.driftSpeed * 60 + route.phase) * route.amp * H
+    );
   }
 
   draw(ctx, W, H, timeMs) {
     ctx.clearRect(0, 0, W, H);
 
-    const base = ctx.createRadialGradient(W * 0.5, H * 0.22, 0, W * 0.5, H * 0.22, Math.max(W, H) * 0.75);
-    base.addColorStop(0, '#1b232b');
-    base.addColorStop(0.75, '#10161c');
-    base.addColorStop(1, '#0a0d10');
+    const base = ctx.createRadialGradient(W * 0.5, H * 0.18, 0, W * 0.5, H * 0.18, Math.max(W, H) * 0.8);
+    base.addColorStop(0, INK_LIGHT);
+    base.addColorStop(0.6, INK);
+    base.addColorStop(1, '#15110d');
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, W, H);
 
-    const minDim = Math.min(W, H);
-    const t = timeMs * 0.00018;
-
-    ctx.globalCompositeOperation = 'source-over';
-    this.flowLines.forEach((fl) => {
+    // 海線藍路徑（同一筆畫粗細，呼應導覽地圖的路徑線）
+    ctx.lineCap = 'round';
+    this.routes.forEach((route) => {
       ctx.beginPath();
-      const yBase = fl.baseY * H;
-      for (let x = 0; x <= W; x += 16) {
-        const y = yBase + Math.sin(x * 0.006 * fl.freq + timeMs * fl.speed * 40 + fl.phase) * fl.amp * H;
+      for (let x = 0; x <= W; x += 14) {
+        const y = this._routeY(route, x / W, W, H, timeMs);
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
-      ctx.strokeStyle = hexToRgba(fl.color, 0.05);
-      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = hexToRgba(BLUE, 0.22);
+      ctx.lineWidth = 1.6;
       ctx.stroke();
     });
 
-    ctx.globalCompositeOperation = 'lighter';
-    this.blobs.forEach((z) => {
-      const cx = z.anchorX * W + Math.sin(t * z.freqX + z.phase) * z.ampX * W;
-      const cy = z.anchorY * H + Math.cos(t * z.freqY + z.phase * 1.3) * z.ampY * H;
-      const r = z.baseR * minDim * (1 + 0.1 * Math.sin(t * z.rFreq * 2 + z.phase));
-      const parts = [
-        { ox: 0, oy: 0, rf: 1 },
-        { ox: Math.cos(t * 1.5 + z.phase) * r * 0.4, oy: Math.sin(t * 1.2 + z.phase) * r * 0.4, rf: 0.6 },
-        { ox: Math.cos(t * -1.1 + z.phase * 1.4) * r * 0.38, oy: Math.sin(t * -1.6 + z.phase * 1.4) * r * 0.38, rf: 0.48 },
-      ];
-      parts.forEach((p) => {
-        const bx = cx + p.ox;
-        const by = cy + p.oy;
-        const br = r * p.rf;
-        const grad = ctx.createRadialGradient(bx, by, 0, bx, by, br);
-        grad.addColorStop(0, hexToRgba(z.color, 0.22));
-        grad.addColorStop(0.55, hexToRgba(z.color, 0.09));
-        grad.addColorStop(1, hexToRgba(z.color, 0));
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(bx, by, br, 0, Math.PI * 2);
-        ctx.fill();
-      });
+    // 站點橙：沿藍線移動、停留、返回——只當標點，不當背景色
+    this.stations.forEach((station) => {
+      const t = 0.5 + 0.5 * station.range * Math.sin(timeMs * station.speed + station.phase);
+      const x = t * W;
+      const y = this._routeY(station.route, t, W, H, timeMs);
+
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, 26);
+      glow.addColorStop(0, hexToRgba(ORANGE, 0.55));
+      glow.addColorStop(1, hexToRgba(ORANGE, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, 26, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = hexToRgba(ORANGE, 0.95);
+      ctx.beginPath();
+      ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+      ctx.fill();
     });
 
+    // 米紙白微光粒子：極稀疏，作氛圍不作主體
     ctx.globalCompositeOperation = 'lighter';
     this.particles.forEach((p) => {
       const life = ((timeMs * p.speed + p.phase) % 1 + 1) % 1;
       const py = (1 - life) * H;
       const px = (p.x + Math.sin(life * 8 + p.phase) * p.drift) * W;
-      const alpha = Math.sin(life * Math.PI) * 0.3;
+      const alpha = Math.sin(life * Math.PI) * 0.16;
       ctx.beginPath();
       ctx.arc(px, py, p.size, 0, Math.PI * 2);
-      ctx.fillStyle = hexToRgba('#e3b873', alpha);
+      ctx.fillStyle = hexToRgba(PAPER, alpha);
       ctx.fill();
     });
-
     ctx.globalCompositeOperation = 'source-over';
   }
 }

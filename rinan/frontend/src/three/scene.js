@@ -93,7 +93,7 @@ export class GardenScene {
     // canvas texture 上，避免整片死黑、也讓 Wall 頁呼應現場其他視覺色調。
     this.ambientBg = new AmbientBackground();
     this.scene.background = this.ambientBg.texture;
-    this.scene.fog = new THREE.FogExp2('#12181d', 0.12);
+    this.scene.fog = new THREE.FogExp2('#231f1a', 0.12);
     this.composer.passes[0].scene = this.scene;
 
     this.plantsRoot = new THREE.Group();

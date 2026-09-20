@@ -1,3 +1,5 @@
+import { PlantCloseupViewer } from './PlantCloseupViewer.jsx';
+
 export function StoryModal({ plant, onClose }) {
   if (!plant) return null;
   return (
@@ -6,6 +8,7 @@ export function StoryModal({ plant, onClose }) {
         <button type="button" className="story-close" onClick={onClose} aria-label="關閉">
           ✕
         </button>
+        <PlantCloseupViewer plantId={plant.id} />
         <div className="story-head">
           <div>
             <div className="story-role">{plant.role}</div>
