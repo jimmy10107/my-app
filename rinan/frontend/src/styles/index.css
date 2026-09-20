@@ -417,23 +417,13 @@ textarea {
 
 .closeup-viewer__introbar {
   position: absolute;
-  top: 0.8rem;
+  top: 0.9rem;
   left: 0;
   right: 0;
-  display: flex;
-  justify-content: center;
-  gap: 0.35rem;
-}
-
-.closeup-viewer__dot {
-  width: 1.4rem;
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(216, 208, 184, 0.25);
-}
-
-.closeup-viewer__dot.is-active {
-  background: var(--gold);
+  text-align: center;
+  font-size: 0.78rem;
+  color: #d8d0b8;
+  letter-spacing: 0.02em;
 }
 
 .closeup-viewer__hint,

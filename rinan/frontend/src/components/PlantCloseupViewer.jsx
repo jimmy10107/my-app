@@ -144,13 +144,7 @@ export function PlantCloseupViewer({ plantId }) {
         ))}
       </div>
 
-      {phase === 'intro' && (
-        <div className="closeup-viewer__introbar">
-          {stages.map((s, i) => (
-            <span key={s.slot} className={`closeup-viewer__dot${i === introFrame ? ' is-active' : ''}`} />
-          ))}
-        </div>
-      )}
+      {phase === 'intro' && <div className="closeup-viewer__introbar">持續生長中～ 先閱讀故事</div>}
 
       {phase === 'ready' && modelStatus === 'loading' && (
         <div className="closeup-viewer__hint">載入中…{progress > 0 ? `${Math.round(progress * 100)}%` : ''}</div>
