@@ -37,6 +37,12 @@ function loadGltf(url, onProgress) {
   return gltfCache.get(url);
 }
 
+// 進彈窗時提前在背景預載每個階段的 glTF（走同一個 gltfCache），
+// 等使用者點到那個階段，load() 直接命中快取、幾乎秒開。
+export function preloadGltf(url, onProgress) {
+  return loadGltf(url, onProgress);
+}
+
 export class CloseupScene {
   constructor(canvas) {
     this.canvas = canvas;
