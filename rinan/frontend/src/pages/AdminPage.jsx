@@ -63,20 +63,24 @@ function Dashboard({ token, onLogout }) {
   const [pending, setPending] = useState([]);
   const [stats, setStats] = useState(null);
   const [lineStats, setLineStats] = useState(null);
+  const [plantingStats, setPlantingStats] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   async function refresh() {
     setError(null);
     try {
-      const [{ plantings }, statsData, lineStatsData] = await Promise.all([
+      const [{ plantings }, statsData, lineStatsData, plantingStatsData] = await Promise.all([
         api.pendingPlantings(token),
         api.visitStats(token),
         api.lineUserStats(token),
+        api.plantingStats(token),
       ]);
       setPending(plantings);
       setStats(statsData);
       setLineStats(lineStatsData);
+      setPlantingStats(plantingStatsData);
     } catch (err) {
       if (err.message.includes('過期') || err.message.includes('登入')) {
         onLogout();
@@ -85,6 +89,18 @@ function Dashboard({ token, onLogout }) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    setError(null);
+    try {
+      await api.downloadPlantingsCsv(token);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -130,6 +146,26 @@ function Dashboard({ token, onLogout }) {
         </section>
       )}
 
+      {plantingStats && (
+        <>
+          <h2 className="admin-page__section-title">整體參與（LINE ＋ 平板 Kiosk 合計）</h2>
+          <section className="admin-page__stats">
+            <div>
+              <span className="admin-page__stat-value">{plantingStats.totalInteractions}</span>
+              <span>人次（種植總筆數）</span>
+            </div>
+            <div>
+              <span className="admin-page__stat-value">{plantingStats.uniqueParticipants}</span>
+              <span>人數（不重複參與者）</span>
+            </div>
+            <div>
+              <span className="admin-page__stat-value">{plantingStats.bySource?.kiosk?.participants ?? 0}</span>
+              <span>平板參與人數</span>
+            </div>
+          </section>
+        </>
+      )}
+
       {lineStats && (
         <>
           <h2 className="admin-page__section-title">LINE 使用者（去重留存）</h2>
@@ -150,6 +186,12 @@ function Dashboard({ token, onLogout }) {
         </>
       )}
 
+      <div className="admin-page__export-row">
+        <button type="button" onClick={handleExport} disabled={exporting}>
+          {exporting ? '下載中…' : '下載原始名單 CSV'}
+        </button>
+      </div>
+
       {error && <p className="page__error">{error}</p>}
 
       {loading ? (
@@ -161,7 +203,11 @@ function Dashboard({ token, onLogout }) {
           {pending.map((item) => (
             <li key={item.id} className="admin-page__item">
               <div>
-                <strong>{plantById(item.plant_type)?.name}</strong>
+                <strong>
+                  {plantById(item.plant_type)?.name}
+                  {item.display_name && `｜${item.display_name}`}
+                </strong>
+                <span className="admin-page__source-badge">{item.source === 'kiosk' ? '平板' : 'LINE'}</span>
                 <p>{item.message || '（沒有留言）'}</p>
                 <time>{new Date(item.created_at).toLocaleString('zh-TW')}</time>
               </div>

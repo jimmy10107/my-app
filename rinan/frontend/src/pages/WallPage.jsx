@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 import { plantById } from '../lib/plants.js';
 import { GardenScene } from '../three/scene.js';
 import { StoryModal } from '../components/StoryModal.jsx';
+import { MessageCloud } from '../components/MessageCloud.jsx';
 
 export function WallPage() {
   const wrapRef = useRef(null);
@@ -11,9 +12,7 @@ export function WallPage() {
   const plantingsRef = useRef([]);
 
   const [plantings, setPlantings] = useState([]);
-  const [latestMessage, setLatestMessage] = useState(null);
   const [storyPlant, setStoryPlant] = useState(null);
-  const messageTimer = useRef(null);
 
   // Three.js 場景只需要建立一次；資料更新時用 setEntries() 局部同步，
   // 不重新建立整個 WebGL context（避免每次 realtime 事件都重新編譯 shader）。
@@ -52,7 +51,7 @@ export function WallPage() {
 
     supabase
       .from('plantings')
-      .select('id, plant_type, message, created_at')
+      .select('id, plant_type, display_name, message, created_at')
       .eq('status', 'approved')
       .order('created_at', { ascending: true })
       .then(({ data }) => {
@@ -67,41 +66,31 @@ export function WallPage() {
         (payload) => {
           const row = payload.new;
           setPlantings((prev) => (prev.some((p) => p.id === row.id) ? prev : [...prev, row]));
-          announce(row);
         }
       )
       .subscribe();
 
-    function announce(row) {
-      setLatestMessage(row);
-      clearTimeout(messageTimer.current);
-      messageTimer.current = setTimeout(() => setLatestMessage(null), 8000);
-    }
-
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
-      clearTimeout(messageTimer.current);
     };
   }, []);
 
-  return (
-    <div className="page wall-page">
-      <header className="wall-page__header">
-        <span className="wall-page__eyebrow">TO AND FROM｜日南稻站</span>
-        <h1>Grounded in Rinan｜日南生根</h1>
-        <p>{plantings.length} 株，一起長出來的日南 — 點一株看看它的故事</p>
-      </header>
+  // 文字雲只要最近的一批，太多的話跑馬燈會繞太久才重複，越晚種下的排越前面。
+  const cloudEntries = useMemo(() => plantings.slice(-40).reverse(), [plantings]);
 
-      <div className="wall-page__stage" ref={wrapRef}>
+  return (
+    <div className="wall-page">
+      <div className="wall-page__stage-wrap" ref={wrapRef}>
+        <header className="wall-page__header">
+          <span className="wall-page__eyebrow">TO AND FROM｜日南稻站</span>
+          <h1>Grounded in Rinan｜日南生根</h1>
+          <p>{plantings.length} 株，一起長出來的日南 — 點一株看看它的故事</p>
+        </header>
         <canvas ref={canvasRef} />
       </div>
 
-      {latestMessage && (
-        <div className="wall-page__ticker">
-          {plantById(latestMessage.plant_type)?.name}：{latestMessage.message || '（沒有留言）'}
-        </div>
-      )}
+      <MessageCloud entries={cloudEntries} />
 
       <StoryModal plant={storyPlant} onClose={() => setStoryPlant(null)} />
     </div>

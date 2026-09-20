@@ -1,28 +1,27 @@
 import { useEffect, useState } from 'react';
-import { ensureLoggedIn, getAccessToken, getProfile } from '../lib/liff.js';
 import { api } from '../lib/api.js';
 import { PlantingForm } from '../components/PlantingForm.jsx';
 
-export function PlayPage() {
-  const [ready, setReady] = useState(false);
+// 現場固定平板用，不需要 LINE。一進頁面就跟後端要一組流水編號（同時計一次人流），
+// 之後同一次平板使用期間送出的每一株都算同一個編號，直到頁面被重新整理／重置。
+export function KioskPage() {
+  const [sessionId, setSessionId] = useState(null);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
-  const [displayName, setDisplayName] = useState(null);
 
   useEffect(() => {
-    ensureLoggedIn()
-      .then(() => {
-        setReady(true);
-        // 暱稱只用來預填「使用 LINE 暱稱」選項，拿不到也不擋主要功能。
-        getProfile()
-          .then((profile) => setDisplayName(profile.displayName))
-          .catch(() => {});
-      })
-      .catch((err) => setError(err.message || 'LINE 登入失敗，請重新整理頁面再試一次'));
+    api
+      .createKioskSession()
+      .then(({ sessionId: id }) => setSessionId(id))
+      .catch((err) => setError(err.message || '無法連線，請通知工作人員'));
   }, []);
 
   async function handleSubmit({ plantType, message, nickname }) {
+    if (!sessionId) {
+      setError('尚未取得互動編號，請稍候再試');
+      return;
+    }
     if (!plantType) {
       setError('請先選一株植物');
       return;
@@ -35,8 +34,7 @@ export function PlayPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const accessToken = getAccessToken();
-      const { notice } = await api.submitPlanting({ accessToken, plantType, message, nickname });
+      const { notice } = await api.submitPlanting({ kioskSessionId: sessionId, plantType, message, nickname });
       setResult(notice);
     } catch (err) {
       setError(err.message);
@@ -45,8 +43,8 @@ export function PlayPage() {
     }
   }
 
-  if (!ready && !error) {
-    return <div className="page page--center">正在連接 LINE…</div>;
+  if (!sessionId && !error) {
+    return <div className="page page--center">連線中…</div>;
   }
 
   if (result) {
@@ -61,7 +59,5 @@ export function PlayPage() {
     );
   }
 
-  return (
-    <PlantingForm lineDisplayName={displayName} onSubmit={handleSubmit} submitting={submitting} error={error} />
-  );
+  return <PlantingForm onSubmit={handleSubmit} submitting={submitting} error={error} />;
 }

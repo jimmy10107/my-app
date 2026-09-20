@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { PlayPage } from './pages/PlayPage.jsx';
+import { KioskPage } from './pages/KioskPage.jsx';
 import { WallPage } from './pages/WallPage.jsx';
 import { AdminPage } from './pages/AdminPage.jsx';
 
@@ -11,6 +12,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/play" replace />} />
         <Route path="/play" element={<PlayPage />} />
+        <Route path="/kiosk" element={<KioskPage />} />
         <Route path="/wall" element={<WallPage />} />
         <Route path="/admin" element={<AdminPage />} />
       </Routes>

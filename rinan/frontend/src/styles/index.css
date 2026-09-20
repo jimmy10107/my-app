@@ -134,15 +134,61 @@ textarea {
   padding: 0.1rem;
 }
 
-/* Wall */
+.nickname-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.nickname-field__label {
+  font-weight: 600;
+}
+
+.nickname-field__option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nickname-field__option input {
+  width: auto;
+}
+
+.nickname-field__solo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.nickname-field__input {
+  margin-top: 0.2rem;
+}
+
+/* Wall：畫面 85% 是 3D 共生牆，下方 15% 是文字雲跑馬燈 */
 .wall-page {
   max-width: none;
-  min-height: 100vh;
+  width: 100vw;
+  height: 100vh;
   padding: 0;
   background: #0c100d;
   color: #ede6d6;
-  position: relative;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+}
+
+.wall-page__stage-wrap {
+  position: relative;
+  flex: 0 0 85%;
+  min-height: 0;
+}
+
+.wall-page__stage-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .wall-page__header {
@@ -175,28 +221,56 @@ textarea {
   font-size: 0.85rem;
 }
 
-.wall-page__stage {
-  position: absolute;
-  inset: 0;
+/* 文字雲跑馬燈 */
+.message-cloud {
+  flex: 0 0 15%;
+  min-height: 64px;
+  background: #14181a;
+  border-top: 1px solid #262e26;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
 
-.wall-page__stage canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
+.message-cloud--empty {
+  justify-content: center;
+  color: #6a6a5a;
+  font-size: 0.85rem;
 }
 
-.wall-page__ticker {
-  position: absolute;
-  bottom: 1.75rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.55);
-  padding: 0.6rem 1.2rem;
+.message-cloud__track {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  width: max-content;
+  padding: 0 1.5rem;
+  animation: message-cloud-scroll 60s linear infinite;
+}
+
+@keyframes message-cloud-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.message-cloud__pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  border: 1px solid;
   border-radius: 999px;
-  z-index: 2;
-  font-size: 0.9rem;
-  max-width: 90vw;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  color: #ede6d6;
+}
+
+.message-cloud__text {
+  color: #a9a396;
 }
 
 /* Story modal (shared by Play + Wall) */
@@ -336,4 +410,19 @@ textarea {
 .admin-page__actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.admin-page__source-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  color: #6a6a5a;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+.admin-page__export-row {
+  display: flex;
+  justify-content: flex-end;
 }
