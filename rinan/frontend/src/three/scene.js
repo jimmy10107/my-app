@@ -161,6 +161,12 @@ export class GardenScene {
     this.composer.setSize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+
+    // 相機距離／高度原本是照桌機／投影機的寬螢幕（16:10 上下）調的。手機直向螢幕
+    // 又窄又高，同一組距離會讓畫面裡的植物顯得又小又稀疏，所以窄螢幕時把相機拉近一些。
+    const aspect = width / height;
+    const TUNED_ASPECT = 1.6;
+    this._cameraScale = Math.min(1, Math.max(0.42, aspect / TUNED_ASPECT));
   }
 
   _positionFor(id) {
@@ -251,8 +257,9 @@ export class GardenScene {
 
   _updateCamera(elapsed) {
     this.cameraAngle += 0.00035;
-    const radius = 3.6;
-    const height = 2.05 + Math.sin(elapsed * 0.12) * 0.08;
+    const scale = this._cameraScale ?? 1;
+    const radius = 3.6 * scale;
+    const height = (2.05 + Math.sin(elapsed * 0.12) * 0.08) * Math.max(0.65, scale);
     this.camera.position.set(Math.cos(this.cameraAngle) * radius, height, Math.sin(this.cameraAngle) * radius);
     this.camera.lookAt(0, 0.35, 0);
   }
