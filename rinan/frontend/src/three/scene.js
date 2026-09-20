@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { buildStage, disposeGroup } from './plantModels.js';
 import { growthState } from './growth.js';
 import { plantById } from '../lib/plants.js';
+import { AmbientBackground } from './ambientBackground.js';
 
 const GROUND_RADIUS = 2.6;
 const PARTICLE_COUNT = 48;
@@ -88,8 +89,11 @@ export class GardenScene {
 
   _initScene() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#0c100d');
-    this.scene.fog = new THREE.FogExp2('#0c100d', 0.16);
+    // 背景不用純色，改用會緩緩漂浮的展覽識別色（CIS）色塊＋粒子，畫在一張
+    // canvas texture 上，避免整片死黑、也讓 Wall 頁呼應現場其他視覺色調。
+    this.ambientBg = new AmbientBackground();
+    this.scene.background = this.ambientBg.texture;
+    this.scene.fog = new THREE.FogExp2('#12181d', 0.12);
     this.composer.passes[0].scene = this.scene;
 
     this.plantsRoot = new THREE.Group();
@@ -167,6 +171,8 @@ export class GardenScene {
     const aspect = width / height;
     const TUNED_ASPECT = 1.6;
     this._cameraScale = Math.min(1, Math.max(0.42, aspect / TUNED_ASPECT));
+
+    this.ambientBg.resize(width, height);
   }
 
   _positionFor(id) {
@@ -268,6 +274,7 @@ export class GardenScene {
     const loop = () => {
       if (this._destroyed) return;
       const elapsed = this.clock.getElapsedTime();
+      this.ambientBg.update(elapsed * 1000);
       this._updateCamera(elapsed);
       this._updatePlants(Date.now());
       this._updateParticles(elapsed);
@@ -288,6 +295,7 @@ export class GardenScene {
     this.particles.geometry.dispose();
     this.particles.material.map?.dispose();
     this.particles.material.dispose();
+    this.ambientBg.dispose();
     this.renderer.dispose();
   }
 }

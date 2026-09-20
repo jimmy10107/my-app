@@ -172,7 +172,7 @@ textarea {
   width: 100vw;
   height: 100vh;
   padding: 0;
-  background: #0c100d;
+  background: radial-gradient(ellipse 90% 70% at 50% 20%, #1b232b, #0a0d10 75%);
   color: #ede6d6;
   display: flex;
   flex-direction: column;
