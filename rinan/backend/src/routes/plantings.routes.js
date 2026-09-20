@@ -17,6 +17,7 @@ const PLANT_TYPES = new Set([
 ]);
 
 const NICKNAME_LIMIT = 16;
+const MESSAGE_LIMIT = 15;
 
 // 互動頁／Kiosk 送出「種下一株」：LINE 走 LIFF token 驗證，Kiosk 走現場發的流水編號。
 // 兩種來源都要先過內容過濾，再寫入 pending 狀態等待人工審核。
@@ -27,8 +28,8 @@ plantingsRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: '未知的植物種類' });
   }
 
-  if (typeof message !== 'string' || message.length > 60) {
-    return res.status(400).json({ error: '留言需為 60 字以內的文字' });
+  if (typeof message !== 'string' || message.length > MESSAGE_LIMIT) {
+    return res.status(400).json({ error: `留言需為 ${MESSAGE_LIMIT} 字以內的文字` });
   }
 
   const trimmedNickname = typeof nickname === 'string' ? nickname.trim() : '';

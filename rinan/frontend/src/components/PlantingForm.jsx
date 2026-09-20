@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PlantPicker } from './PlantPicker.jsx';
 import { StoryModal } from './StoryModal.jsx';
 
-const MESSAGE_LIMIT = 60;
+const MESSAGE_LIMIT = 15;
 const NICKNAME_LIMIT = 16;
 
 // Play（有 LINE 暱稱可選）與 Kiosk（只能自己打暱稱）共用同一份表單，

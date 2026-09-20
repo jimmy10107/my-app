@@ -15,7 +15,7 @@ create table if not exists public.plantings (
   plant_type text not null check (
     plant_type in ('casuarina', 'rice', 'taro', 'koelreuteria', 'miscanthus', 'broussonetia')
   ),
-  message text check (char_length(message) <= 60),
+  message text check (char_length(message) <= 15),
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   created_at timestamptz not null default now(),
   moderated_at timestamptz,
@@ -26,6 +26,10 @@ create table if not exists public.plantings (
 alter table public.plantings add column if not exists source text not null default 'line';
 alter table public.plantings drop constraint if exists plantings_source_check;
 alter table public.plantings add constraint plantings_source_check check (source in ('line', 'kiosk'));
+
+-- 留言字數上限從舊版 60 字改成 15 字，既有資料庫要跑這個才會套用新限制。
+alter table public.plantings drop constraint if exists plantings_message_check;
+alter table public.plantings add constraint plantings_message_check check (char_length(message) <= 15);
 
 create index if not exists plantings_status_created_at_idx
   on public.plantings (status, created_at desc);
