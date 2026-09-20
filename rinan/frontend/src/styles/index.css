@@ -429,30 +429,70 @@ textarea {
   pointer-events: none;
 }
 
-.closeup-viewer__tabs {
+/* 生長階段滑輪：拖曳距離是線性的，但底層對應到 4 個不連續的模型區間
+   （0–25／25–50／50–75／75–100），跨過門檻才切換模型，區間內只是同一顆
+   模型繼續轉動，不重新載入。動畫播完前整條鎖住，避免半載入狀態被亂拖。 */
+.closeup-viewer__slider {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  display: flex;
+  padding: 0.5rem 0.9rem 0.6rem;
   background: rgba(10, 13, 16, 0.55);
   backdrop-filter: blur(2px);
 }
 
-.closeup-viewer__tab {
-  flex: 1;
-  background: none;
-  border: none;
-  border-radius: 0;
-  color: #a9a396;
-  font-size: 0.72rem;
-  padding: 0.45rem 0.2rem;
-  border-top: 2px solid transparent;
+.closeup-viewer__range {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  appearance: none;
+  background: linear-gradient(
+    to right,
+    rgba(217, 149, 49, 0.55) 0 25%,
+    rgba(69, 108, 144, 0.55) 25% 50%,
+    rgba(217, 149, 49, 0.55) 50% 75%,
+    rgba(69, 108, 144, 0.55) 75% 100%
+  );
+  outline: none;
+  padding: 0;
 }
 
-.closeup-viewer__tab.is-selected {
-  color: var(--gold);
-  border-top-color: var(--gold);
+.closeup-viewer__range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2px solid #15110d;
+  cursor: pointer;
+}
+
+.closeup-viewer__range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2px solid #15110d;
+  cursor: pointer;
+}
+
+.closeup-viewer__range--disabled {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(216, 208, 184, 0.2);
+}
+
+.closeup-viewer__slider--locked {
+  opacity: 0.6;
+}
+
+.closeup-viewer__slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  font-size: 0.66rem;
+  color: #a9a396;
 }
 
 .closeup-viewer__retry {

@@ -2,8 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { CloseupScene, preloadGltf } from '../three/closeupScene.js';
 import { closeupStagesFor } from '../lib/closeupModels.js';
 
-const INTRO_FRAME_MS = 1500; // 4 階段 x 1.5s ≈ 6 秒，對齊「六到七秒跑完生長歷程」的目標
-const DEFAULT_SLOT = 2; // 盛開，動畫結束後預設看的階段
+const FRAME_MS = 900; // flipbook 逐格間隔，等待期間持續循環播放
+const MIN_INTRO_MS = 6000; // 至少播完一輪完整生長歷程，不管模型多快載完
+const MAX_INTRO_MS = 24000; // 保底上限：真的卡住也不能讓使用者永遠卡在動畫
+const ZONE_COUNT = 4;
+const DEFAULT_SLIDER = 60; // 落在「盛開」區間，動畫結束後預設看的形態
+
+function zoneForSlider(value) {
+  return Math.min(ZONE_COUNT - 1, Math.floor((value / 100) * ZONE_COUNT));
+}
 
 export function PlantCloseupViewer({ plantId }) {
   const wrapRef = useRef(null);
@@ -12,46 +19,57 @@ export function PlantCloseupViewer({ plantId }) {
 
   const stages = closeupStagesFor(plantId);
 
-  const [phase, setPhase] = useState('intro'); // 'intro' | 'interactive'
+  const [phase, setPhase] = useState('intro'); // 'intro' | 'ready'
   const [introFrame, setIntroFrame] = useState(0);
-  const [selectedSlot, setSelectedSlot] = useState(DEFAULT_SLOT);
-  const [modelStatus, setModelStatus] = useState('loading'); // 目前這個階段的 3D 模型狀態
+  const [sliderValue, setSliderValue] = useState(DEFAULT_SLIDER);
+  const [activeZone, setActiveZone] = useState(zoneForSlider(DEFAULT_SLIDER));
+  const [modelStatus, setModelStatus] = useState('loading');
   const [progress, setProgress] = useState(0);
   const [retryTick, setRetryTick] = useState(0);
 
-  // 一進彈窗：背景搶先預載四個階段的 glTF（不需要 canvas，先把資料抓回來），
-  // 同時跑靜態圖 flipbook。使用者隨時可以點某個階段提早跳過動畫進互動模式。
+  // 四個階段的 glTF「一起」平行預載（不是點了才一個一個載），flipbook 至少播
+  // MIN_INTRO_MS，全部載完（或超過 MAX_INTRO_MS 保底逾時）才會解鎖 3D／滑輪／縮放。
   useEffect(() => {
     if (!stages) return undefined;
     let cancelled = false;
     setPhase('intro');
     setIntroFrame(0);
-    setSelectedSlot(DEFAULT_SLOT);
+    setSliderValue(DEFAULT_SLIDER);
+    setActiveZone(zoneForSlider(DEFAULT_SLIDER));
 
-    stages.forEach((stage) => {
-      preloadGltf(stage.file).catch(() => {});
+    const startedAt = Date.now();
+    const loadAll = Promise.all(stages.map((stage) => preloadGltf(stage.file).catch(() => null)));
+
+    const frameTimer = setInterval(() => {
+      setIntroFrame((f) => (f + 1) % stages.length);
+    }, FRAME_MS);
+
+    let settleTimer;
+    const finishIntro = () => {
+      if (cancelled) return;
+      clearInterval(frameTimer);
+      clearTimeout(settleTimer);
+      setPhase('ready');
+    };
+
+    loadAll.then(() => {
+      const elapsed = Date.now() - startedAt;
+      const remaining = Math.max(0, MIN_INTRO_MS - elapsed);
+      settleTimer = setTimeout(finishIntro, remaining);
     });
-
-    const timer = setInterval(() => {
-      setIntroFrame((f) => {
-        if (f >= stages.length - 1) {
-          clearInterval(timer);
-          if (!cancelled) setPhase('interactive');
-          return f;
-        }
-        return f + 1;
-      });
-    }, INTRO_FRAME_MS);
+    const hardCap = setTimeout(finishIntro, MAX_INTRO_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      clearInterval(frameTimer);
+      clearTimeout(settleTimer);
+      clearTimeout(hardCap);
     };
   }, [plantId, stages]);
 
-  // 進互動模式後才建立 WebGL 場景（intro 階段只放靜態圖，不用先開 GL context）。
+  // 進 ready 階段才建立 WebGL 場景／掛 OrbitControls，intro 期間完全不能互動。
   useEffect(() => {
-    if (phase !== 'interactive' || !stages) return undefined;
+    if (phase !== 'ready' || !stages) return undefined;
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
     const scene = new CloseupScene(canvas);
@@ -71,13 +89,13 @@ export function PlantCloseupViewer({ plantId }) {
     };
   }, [phase, stages]);
 
-  // 切換階段（互動模式下）：對應的 glTF 通常在 intro 階段已經預載完成，直接秒開；
-  // 沒好的話一樣走 progress／timeout。
+  // 滑輪跨過某個區間門檻才換模型（模型此時通常早已預載完成，幾乎秒切）；
+  // 區間內拖曳不重新載入，只是同一顆模型繼續轉動。
   useEffect(() => {
-    if (phase !== 'interactive' || !stages) return undefined;
+    if (phase !== 'ready' || !stages) return undefined;
     const scene = sceneRef.current;
     if (!scene) return undefined;
-    const stage = stages[selectedSlot];
+    const stage = stages[activeZone];
     let cancelled = false;
     setModelStatus('loading');
     setProgress(0);
@@ -94,55 +112,71 @@ export function PlantCloseupViewer({ plantId }) {
     return () => {
       cancelled = true;
     };
-  }, [phase, selectedSlot, stages, retryTick]);
+  }, [phase, activeZone, stages, retryTick]);
 
   if (!stages) return null;
 
-  function jumpToStage(slotIndex) {
-    setSelectedSlot(slotIndex);
-    setPhase('interactive');
+  function handleSlider(event) {
+    const value = Number(event.target.value);
+    setSliderValue(value);
+    const zone = zoneForSlider(value);
+    if (zone !== activeZone) setActiveZone(zone);
   }
 
   const showStill = phase === 'intro' || modelStatus !== 'ready';
-  const stillSrc = phase === 'intro' ? stages[introFrame].still : stages[selectedSlot].still;
+  const stillSrc = phase === 'intro' ? stages[introFrame].still : stages[activeZone].still;
 
   return (
     <div className="closeup-viewer" ref={wrapRef}>
-      <canvas ref={canvasRef} style={{ visibility: phase === 'interactive' ? 'visible' : 'hidden' }} />
+      <canvas ref={canvasRef} style={{ visibility: phase === 'ready' ? 'visible' : 'hidden' }} />
       {showStill && <img className="closeup-viewer__still" src={stillSrc} alt="" />}
 
       {phase === 'intro' && (
         <div className="closeup-viewer__introbar">
           {stages.map((s, i) => (
-            <span key={s.slot} className={`closeup-viewer__dot${i <= introFrame ? ' is-active' : ''}`} />
+            <span key={s.slot} className={`closeup-viewer__dot${i === introFrame ? ' is-active' : ''}`} />
           ))}
         </div>
       )}
 
-      {phase === 'interactive' && modelStatus === 'loading' && (
-        <div className="closeup-viewer__hint">載入 3D 模型中…{progress > 0 ? `${Math.round(progress * 100)}%` : ''}</div>
+      {phase === 'ready' && modelStatus === 'loading' && (
+        <div className="closeup-viewer__hint">載入中…{progress > 0 ? `${Math.round(progress * 100)}%` : ''}</div>
       )}
-      {phase === 'interactive' && modelStatus === 'error' && (
+      {phase === 'ready' && modelStatus === 'error' && (
         <button type="button" className="closeup-viewer__retry" onClick={() => setRetryTick((n) => n + 1)}>
           模型載入失敗，點一下重試
         </button>
       )}
-      {phase === 'interactive' && modelStatus === 'ready' && (
-        <div className="closeup-viewer__tag">{stages[selectedSlot].stageLabel}．可拖曳旋轉</div>
+      {phase === 'ready' && modelStatus === 'ready' && (
+        <div className="closeup-viewer__tag">{stages[activeZone].stageLabel}．可拖曳旋轉／縮放</div>
       )}
 
-      <div className="closeup-viewer__tabs">
-        {stages.map((s, i) => (
-          <button
-            key={s.slot}
-            type="button"
-            className={`closeup-viewer__tab${phase === 'interactive' && selectedSlot === i ? ' is-selected' : ''}`}
-            onClick={() => jumpToStage(i)}
-          >
-            {s.slot}
-          </button>
-        ))}
-      </div>
+      {phase === 'ready' ? (
+        <div className="closeup-viewer__slider">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={sliderValue}
+            onChange={handleSlider}
+            className="closeup-viewer__range"
+          />
+          <div className="closeup-viewer__slider-labels">
+            {stages.map((s) => (
+              <span key={s.slot}>{s.slot}</span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="closeup-viewer__slider closeup-viewer__slider--locked">
+          <div className="closeup-viewer__range closeup-viewer__range--disabled" />
+          <div className="closeup-viewer__slider-labels">
+            {stages.map((s) => (
+              <span key={s.slot}>{s.slot}</span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
