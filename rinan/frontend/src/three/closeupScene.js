@@ -5,15 +5,34 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 const loader = new GLTFLoader();
 const gltfCache = new Map();
 
-function loadGltf(url) {
+// 模型＋貼圖有機會到 10~20MB，慢速網路下 load 事件可能真的要等好幾秒；
+// 用 onProgress 讓使用者看到百分比而不是死掉的「載入中」，並設一個上限
+// timeout，逾時就明確報錯（可重試），不要讓 Promise 無限期掛著。
+const LOAD_TIMEOUT_MS = 30000;
+
+function loadGltf(url, onProgress) {
   if (!gltfCache.has(url)) {
-    gltfCache.set(
-      url,
-      loader.loadAsync(url).catch((err) => {
-        gltfCache.delete(url);
-        throw err;
-      })
-    );
+    const promise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timeout')), LOAD_TIMEOUT_MS);
+      loader.load(
+        url,
+        (gltf) => {
+          clearTimeout(timer);
+          resolve(gltf);
+        },
+        (event) => {
+          if (event.total) onProgress?.(event.loaded / event.total);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        }
+      );
+    }).catch((err) => {
+      gltfCache.delete(url);
+      throw err;
+    });
+    gltfCache.set(url, promise);
   }
   return gltfCache.get(url);
 }
@@ -78,8 +97,8 @@ export class CloseupScene {
     this.controls.update();
   }
 
-  async load(url, bounds) {
-    const gltf = await loadGltf(url);
+  async load(url, bounds, onProgress) {
+    const gltf = await loadGltf(url, onProgress);
     if (this._destroyed) return;
     if (this.model) {
       this.scene.remove(this.model);
