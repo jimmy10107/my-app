@@ -15,6 +15,9 @@ export function App() {
         <Route path="/kiosk" element={<KioskPage />} />
         <Route path="/wall" element={<WallPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        {/* LINE 開啟 LIFF 時會把登入憑證放在網址 # 後面（#access_token=…），HashRouter 會把它
+            當成路徑而對不到任何頁面、整頁空白。這裡直接顯示互動頁、不改網址，讓 liff.init() 讀得到憑證。 */}
+        <Route path="*" element={<PlayPage />} />
       </Routes>
     </HashRouter>
   );
