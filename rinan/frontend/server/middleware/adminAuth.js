@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
+import { env } from '../env.js';
 
 export function adminAuth(req, res, next) {
   const header = req.headers.authorization || '';

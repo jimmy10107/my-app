@@ -1,4 +1,4 @@
-import { env } from '../config/env.js';
+import { env } from '../env.js';
 
 /**
  * 驗證前端 liff.getAccessToken() 拿到的 token 確實屬於這個 LIFF Channel，

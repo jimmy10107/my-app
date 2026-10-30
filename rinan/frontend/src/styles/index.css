@@ -180,88 +180,294 @@ textarea {
   margin-top: 0.2rem;
 }
 
-/* Wall：畫面 85% 是 3D 共生牆，下方 15% 是文字雲跑馬燈 */
-.wall-page {
-  max-width: none;
-  width: 100vw;
-  height: 100vh;
-  padding: 0;
-  background: radial-gradient(ellipse 90% 70% at 50% 20%, #2f2820, #15110d 75%);
-  color: #ede6d6;
-  display: flex;
-  flex-direction: column;
+/* Wall：整面都是 3D 花園。天空飄著留言文字雲，右下角是掃碼參加卡，底部一條細細的留言條。
+   字級用 vh 計算，1080p 投影跟 4K 投影看起來比例一樣。 */
+.wall {
+  position: fixed;
+  inset: 0;
   overflow: hidden;
+  background: #1a2c40;
+  color: var(--paper);
 }
 
-.wall-page__stage-wrap {
-  position: relative;
-  flex: 0 0 85%;
-  min-height: 0;
+.wall__stage,
+.wall__hud {
+  position: absolute;
+  inset: 0;
 }
 
-.wall-page__stage-wrap canvas {
+.wall__canvas,
+.wall__overlay {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
 }
 
-.wall-page__header {
+.wall__overlay,
+.wall__hud {
+  pointer-events: none;
+}
+
+.wall__header {
   position: absolute;
-  top: 1.75rem;
-  left: 1.75rem;
-  z-index: 2;
-  max-width: 480px;
+  top: 3.4vh;
+  left: 2.6vw;
+  max-width: 46vw;
+  text-shadow: 0 1px 12px rgba(12, 20, 30, 0.45);
 }
 
-.wall-page__eyebrow {
+.wall__eyebrow {
   font-family: 'JetBrains Mono', 'Noto Sans TC', monospace;
-  font-size: 0.7rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--gold);
-  opacity: 0.85;
+  font-size: max(0.7rem, 1.25vh);
+  letter-spacing: 0.18em;
+  color: #f0c27a;
 }
 
-.wall-page__header h1 {
+.wall__header h1 {
   font-family: 'Noto Serif TC', serif;
   font-weight: 900;
-  font-size: clamp(1.4rem, 3vw, 2rem);
-  margin: 0.1rem 0 0.2rem;
+  font-size: max(1.4rem, 4.2vh);
+  line-height: 1.2;
+  margin: 0.25em 0 0.2em;
 }
 
-.wall-page__header p {
+.wall__header p {
   margin: 0;
-  color: #a9a396;
-  font-size: 0.85rem;
+  font-size: max(0.85rem, 1.75vh);
+  color: rgba(246, 242, 232, 0.82);
+  display: flex;
+  align-items: baseline;
+  gap: 0.9em;
+  flex-wrap: wrap;
 }
 
-/* 文字雲跑馬燈 */
-.message-cloud {
-  flex: 0 0 15%;
-  min-height: 64px;
-  background: #1a1611;
-  border-top: 1px solid #332c22;
+.wall__header strong {
+  font-family: 'Noto Serif TC', serif;
+  font-size: 1.35em;
+  color: var(--paper);
+}
+
+.wall__offline {
+  font-size: 0.85em;
+  color: #f0c27a;
+}
+
+/* 天空文字雲：位置由 WordCloud 排好，這裡只管顏色、光暈跟漂浮 */
+.word-cloud {
+  position: absolute;
+  left: 5vw;
+  right: 5vw;
+  top: 14.5vh;
+  height: 23vh;
+}
+
+.word-cloud__word {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--paper);
+  text-shadow:
+    0 0 0.6em rgba(246, 242, 232, 0.22),
+    0 0.04em 0.18em rgba(12, 22, 34, 0.7),
+    0 0.08em 0.6em rgba(12, 22, 34, 0.45);
+  transition:
+    transform 1.8s cubic-bezier(0.25, 0.8, 0.25, 1),
+    font-size 1.8s cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 1.2s ease,
+    color 1.2s ease;
+  animation: word-in 1.6s ease-out both;
+}
+
+.word-cloud__word--meaning {
+  font-weight: 500;
+  color: #c8d9e8;
+}
+
+.word-cloud__word--fresh {
+  color: #ffc56e;
+  text-shadow:
+    0 0 0.45em rgba(217, 149, 49, 0.85),
+    0 0 1.2em rgba(217, 149, 49, 0.5),
+    0 0.06em 0.35em rgba(12, 22, 34, 0.5);
+}
+
+.word-cloud__word--fresh .word-cloud__float {
+  animation:
+    word-pop 1.4s cubic-bezier(0.2, 1.6, 0.4, 1) both,
+    word-float 9s ease-in-out infinite;
+}
+
+.word-cloud__float {
+  display: inline-block;
+  animation: word-float 9s ease-in-out infinite;
+}
+
+@keyframes word-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes word-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+@keyframes word-float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(0.06em, -0.12em);
+  }
+  66% {
+    transform: translate(-0.05em, 0.08em);
+  }
+}
+
+/* 右下角掃碼參加卡 */
+.join-card {
+  position: absolute;
+  right: 2.4vw;
+  bottom: calc(max(46px, 6.2vh) + 2.4vh);
   display: flex;
   align-items: center;
+  gap: 1.6vh;
+  padding: 1.4vh;
+  padding-right: 2.2vh;
+  max-width: 36vw;
+  background: rgba(246, 242, 232, 0.96);
+  color: var(--ink);
+  border-radius: 2vh;
+  box-shadow:
+    0 1.2vh 4vh rgba(10, 16, 24, 0.45),
+    0 0 0 1px rgba(246, 242, 232, 0.6);
+  pointer-events: auto;
+  transition: box-shadow 400ms ease, transform 400ms ease;
+}
+
+.join-card--pulse {
+  transform: translateY(-0.4vh);
+  box-shadow:
+    0 1.2vh 4vh rgba(10, 16, 24, 0.45),
+    0 0 0 0.35vh rgba(217, 149, 49, 0.9),
+    0 0 4vh rgba(217, 149, 49, 0.55);
+}
+
+.join-card__qr {
+  width: max(112px, 15vh);
+  height: max(112px, 15vh);
+  display: block;
+  border-radius: 1vh;
+  image-rendering: pixelated;
+}
+
+.join-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5vh;
+  min-width: 0;
+}
+
+.join-card__eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: max(0.62rem, 1.1vh);
+  letter-spacing: 0.16em;
+  color: var(--blue);
+}
+
+.join-card__text strong {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: max(1rem, 2.5vh);
+  line-height: 1.25;
+}
+
+.join-card__hint {
+  font-size: max(0.75rem, 1.45vh);
+  line-height: 1.5;
+  color: #5b5446;
+  max-width: 15em;
+}
+
+/* 大螢幕用 QR；手機上看牆時 QR 沒意義，改成一顆可以點的按鈕 */
+.join-card__link {
+  display: none;
+}
+
+/* 底部留言條 */
+.ticker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: max(46px, 6.2vh);
+  display: flex;
+  align-items: center;
+  font-size: max(0.8rem, 1.7vh);
+  background: linear-gradient(to bottom, rgba(18, 15, 12, 0), rgba(18, 15, 12, 0.72) 38%);
+}
+
+.ticker__latest {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  max-width: 46vw;
+  height: 100%;
+  padding: 0 1.4em 0 2.6vw;
+  background: linear-gradient(to right, rgba(18, 15, 12, 0.8) 85%, rgba(18, 15, 12, 0));
+  animation: ticker-latest-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  white-space: nowrap;
   overflow: hidden;
 }
 
-.message-cloud--empty {
-  justify-content: center;
-  color: #6a6a5a;
-  font-size: 0.85rem;
+.ticker__latest--empty {
+  color: rgba(246, 242, 232, 0.7);
 }
 
-.message-cloud__track {
+@keyframes ticker-latest-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+.ticker__badge {
+  font-size: 0.78em;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--gold);
+  border-radius: 999px;
+  padding: 0.15em 0.7em;
+}
+
+.ticker__viewport {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+
+.ticker__track {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 2.6em;
   width: max-content;
-  padding: 0 1.5rem;
-  animation: message-cloud-scroll 60s linear infinite;
+  animation: ticker-scroll linear infinite;
 }
 
-@keyframes message-cloud-scroll {
+@keyframes ticker-scroll {
   from {
     transform: translateX(0);
   }
@@ -270,54 +476,105 @@ textarea {
   }
 }
 
-.message-cloud__pill {
-  flex: 0 0 auto;
+.ticker__item {
   display: inline-flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  padding: 0.4rem 1rem;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 0.85rem;
+  align-items: center;
+  gap: 0.5em;
   white-space: nowrap;
-  color: #ede6d6;
+  color: rgba(246, 242, 232, 0.92);
 }
 
-.message-cloud__text {
-  color: #a9a396;
+.ticker__dot {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(246, 242, 232, 0.25);
 }
 
-/* 手機直向螢幕：文字太小、太擠，字級與間距放大一點方便閱讀 */
-@media (max-width: 600px) {
-  .wall-page__header {
+.ticker__plant {
+  color: rgba(246, 242, 232, 0.6);
+}
+
+.ticker__message {
+  color: #f0c27a;
+  quotes: '「' '」';
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-cloud__float,
+  .ticker__track {
+    animation: none;
+  }
+}
+
+/* 手機直向：標題縮小、文字雲變矮，QR 換成按鈕 */
+@media (max-width: 700px) {
+  .wall__header {
     top: 1.1rem;
     left: 1.1rem;
     right: 1.1rem;
     max-width: none;
   }
 
-  .wall-page__header h1 {
+  .wall__header h1 {
     font-size: 1.3rem;
   }
 
-  .wall-page__header p {
-    font-size: 0.95rem;
+  .word-cloud {
+    left: 3vw;
+    right: 3vw;
+    top: 8.5rem;
+    height: 22vh;
   }
 
-  .message-cloud {
-    min-height: 76px;
+  .join-card {
+    left: 1rem;
+    right: 1rem;
+    bottom: calc(52px + 0.8rem);
+    max-width: none;
+    padding: 0.7rem 0.9rem;
+    border-radius: 14px;
   }
 
-  .message-cloud__pill {
-    font-size: 1rem;
-    padding: 0.5rem 1.1rem;
+  .join-card__qr,
+  .join-card__hint,
+  .join-card__eyebrow,
+  .join-card__scan {
+    display: none;
+  }
+
+  .join-card__text {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
     gap: 0.6rem;
   }
 
-  .message-cloud--empty {
-    font-size: 0.95rem;
-    padding: 0 1rem;
-    text-align: center;
+  .join-card__text strong {
+    font-size: 1rem;
+  }
+
+  .join-card__link {
+    display: inline-block;
+    flex: 0 0 auto;
+    background: var(--ink);
+    color: var(--paper);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 0.5rem 0.9rem;
+  }
+
+  .ticker {
+    height: 52px;
+    font-size: 0.85rem;
+  }
+
+  .ticker__latest {
+    max-width: 62vw;
+    padding-left: 1rem;
   }
 }
 
@@ -659,4 +916,265 @@ textarea {
 .admin-page__export-row {
   display: flex;
   justify-content: flex-end;
+}
+
+/* 種下之後：發芽畫面（Play／Kiosk 共用） */
+.planted {
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+.planted__eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  color: var(--blue);
+}
+
+.planted__stage {
+  position: relative;
+  width: min(78vw, 320px);
+  aspect-ratio: 4 / 3;
+  border-radius: 24px;
+  overflow: hidden;
+  background: radial-gradient(ellipse 90% 80% at 50% 70%, #3a3226, #1d1814 75%);
+  box-shadow: 0 18px 40px rgba(35, 31, 32, 0.22);
+}
+
+/* 根部一圈站點橙的光，跟投影牆落地時的光環同一個語彙 */
+.planted__halo {
+  position: absolute;
+  left: 50%;
+  bottom: 14%;
+  width: 46%;
+  aspect-ratio: 3 / 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid rgba(217, 149, 49, 0.85);
+  box-shadow: 0 0 22px rgba(217, 149, 49, 0.55);
+  animation: planted-halo 2.4s ease-out infinite;
+}
+
+@keyframes planted-halo {
+  from {
+    transform: translateX(-50%) scale(0.4);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-50%) scale(1.5);
+    opacity: 0;
+  }
+}
+
+.planted__still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 900ms ease,
+    transform 2400ms ease-out;
+}
+
+.planted__still.is-active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.planted__title {
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 900;
+  font-size: 1.6rem;
+  margin: 0.3rem 0 0;
+}
+
+.planted__notice {
+  margin: 0;
+  color: #5a5a4a;
+  line-height: 1.7;
+}
+
+.planted__card {
+  margin: 0.2rem 0 0;
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--gold);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  text-align: left;
+}
+
+.planted__card blockquote {
+  margin: 0 0 0.35rem;
+  font-family: 'Noto Serif TC', serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.planted__card blockquote.is-empty {
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 0.95rem;
+  color: #8a8578;
+}
+
+.planted__card figcaption {
+  font-size: 0.82rem;
+  color: #6a6a5a;
+}
+
+.planted__actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+}
+
+.planted__secondary {
+  background: transparent;
+  color: var(--ink);
+}
+
+.planted__countdown {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #8a8578;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planted__halo {
+    animation: none;
+  }
+}
+
+/* Admin：參加連結＋QR */
+.admin-page {
+  max-width: 760px;
+}
+
+.admin-join {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.admin-join__qr {
+  width: 132px;
+  height: 132px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+}
+
+.admin-join__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-join__body h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-join__body p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #5a5a4a;
+  line-height: 1.6;
+}
+
+.admin-join__url {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-join__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-join__actions button,
+.admin-join__button {
+  font-size: 0.85rem;
+  padding: 0.45rem 1rem;
+}
+
+.admin-join__button {
+  display: inline-block;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  background: transparent;
+}
+
+.admin-page__item.is-hidden {
+  opacity: 0.6;
+  background: #f3efe6;
+}
+
+.admin-page__item p {
+  margin: 0.3rem 0;
+}
+
+.admin-page__item time {
+  font-size: 0.75rem;
+  color: #8a8578;
+}
+
+.admin-page__status {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  color: #2f5d3a;
+  background: #e3efe1;
+}
+
+.admin-page__status.is-hidden {
+  color: #8a3b2b;
+  background: #f6e2dc;
+}
+
+.admin-page__hide {
+  background: transparent;
+  color: #8a3b2b;
+  border-color: #c9a297;
+}
+
+@media (max-width: 560px) {
+  .admin-join {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .admin-join__actions {
+    justify-content: center;
+  }
+
+  .admin-page__stats {
+    flex-wrap: wrap;
+  }
+
+  .admin-page__stats > div {
+    min-width: 40%;
+  }
 }

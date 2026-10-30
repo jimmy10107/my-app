@@ -16,8 +16,9 @@ function smoothstep(a, b, x) {
  */
 export function growthState(cycleSeconds, createdAtMs, nowMs) {
   const cycleMs = cycleSeconds * 1000;
-  let progress = ((nowMs - createdAtMs) % cycleMs) / cycleMs;
-  if (progress < 0) progress += 1;
+  // 牆面電腦的時鐘可能比資料庫慢幾秒，剛種下的那筆會算出負的經過時間；
+  // 不能讓它繞回週期尾端（剛種就變成凋萎），一律從發芽開始算。
+  const progress = (Math.max(0, nowMs - createdAtMs) % cycleMs) / cycleMs;
 
   const [s1, s2, s3, s4] = STAGE_FRACTIONS;
   let scale;

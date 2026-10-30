@@ -37,7 +37,7 @@ create index if not exists plantings_status_created_at_idx
 create index if not exists plantings_line_user_id_idx
   on public.plantings (line_user_id);
 
-comment on table public.plantings is '互動頁（Play／Kiosk）送出、經後台審核後於投影頁（Wall）即時生成的種植紀錄';
+comment on table public.plantings is '互動頁（Play／Kiosk）送出即以 approved 寫入、投影頁（Wall）即時發芽的種植紀錄；後台可改成 rejected 下架';
 comment on column public.plantings.plant_type is '六種植物：木麻黃(casuarina)守護／水稻(rice)耕作／芋頭(taro)實踐／台灣欒樹(koelreuteria)日常／甜根子草(miscanthus)韌性／構樹(broussonetia)生命力';
 comment on column public.plantings.source is '種下來源：line（LIFF 手機登入）／kiosk（現場固定平板，無 LINE 身分）';
 comment on column public.plantings.line_user_id is 'LINE 來源存真實 userId；kiosk 來源存生成的流水編號（如 UNI-000123），兩者合併去重即為不重複參與人數';
@@ -115,8 +115,8 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
--- 前端 Wall 頁使用 anon key 直接訂閱 Realtime，只能讀到已審核通過的種植紀錄。
--- 寫入、審核、visits 讀寫一律經由後端（service role key）處理，不對外公開。
+-- 前端 Wall 頁使用 anon key 直接讀取與訂閱 Realtime，只能讀到 approved（在牆上）的種植紀錄。
+-- 寫入、下架、visits 讀寫一律經由伺服器端 /api（service role key）處理，不對外公開。
 -- ---------------------------------------------------------------------------
 alter table public.plantings enable row level security;
 alter table public.visits enable row level security;
@@ -130,6 +130,25 @@ create policy "public can read approved plantings"
   to anon, authenticated
   using (status = 'approved');
 
--- 不建立 anon insert/update policy：一律由後端以 service role key 寫入，
--- 這樣才能先驗證 LIFF ID Token、做內容管理，再落地資料庫。
+-- 公開金鑰只能讀投影牆需要的欄位；line_user_id（LINE 身分）與審核紀錄只留給伺服器端。
+revoke select on public.plantings from anon, authenticated;
+grant select (id, plant_type, display_name, message, status, created_at) on public.plantings to anon, authenticated;
+
+-- 不建立 anon insert/update policy：一律由伺服器端以 service role key 寫入，
+-- 這樣才能先驗證 LIFF token、過濾不雅字詞，再落地資料庫。
 -- visits、line_users、kiosk_sessions 表不開放任何 anon 權限，僅 service role 可讀寫。
+
+-- ---------------------------------------------------------------------------
+-- Realtime：把 plantings 加進 supabase_realtime publication，投影牆才收得到即時新增。
+-- （Supabase 預設不會替用 SQL 建的表開 Realtime；重複執行這段不會出錯。）
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'plantings'
+  ) then
+    alter publication supabase_realtime add table public.plantings;
+  end if;
+end
+$$;

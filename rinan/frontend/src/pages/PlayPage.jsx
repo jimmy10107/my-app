@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ensureLoggedIn, getAccessToken, getProfile } from '../lib/liff.js';
 import { api } from '../lib/api.js';
 import { PlantingForm } from '../components/PlantingForm.jsx';
+import { PlantedScreen } from '../components/PlantedScreen.jsx';
 
 export function PlayPage() {
   const [ready, setReady] = useState(false);
@@ -22,6 +23,8 @@ export function PlayPage() {
       .catch((err) => setError(err.message || 'LINE 登入失敗，請重新整理頁面再試一次'));
   }, []);
 
+  const handleAgain = useCallback(() => setResult(null), []);
+
   async function handleSubmit({ plantType, message, nickname }) {
     if (!plantType) {
       setError('請先選一株植物');
@@ -37,7 +40,7 @@ export function PlayPage() {
     try {
       const accessToken = getAccessToken();
       const { notice } = await api.submitPlanting({ accessToken, plantType, message, nickname });
-      setResult(notice);
+      setResult({ notice, plantType, message: message.trim(), nickname });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -50,15 +53,7 @@ export function PlayPage() {
   }
 
   if (result) {
-    return (
-      <div className="page page--center">
-        <h1>種下了！</h1>
-        <p>{result}</p>
-        <button type="button" onClick={() => setResult(null)}>
-          再種一株
-        </button>
-      </div>
-    );
+    return <PlantedScreen {...result} onAgain={handleAgain} />;
   }
 
   return (

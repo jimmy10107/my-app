@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
+import { env } from '../env.js';
 
 export const authRouter = Router();
 
