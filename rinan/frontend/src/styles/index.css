@@ -1040,6 +1040,19 @@ textarea {
   color: var(--ink);
 }
 
+.planted__wall-link {
+  display: block;
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.8rem 1rem;
+  border-radius: 999px;
+  background: var(--blue);
+  color: var(--paper);
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+}
+
 .planted__countdown {
   margin: 0;
   font-size: 0.78rem;

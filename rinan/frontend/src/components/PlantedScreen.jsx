@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { plantById } from '../lib/plants.js';
 import { closeupStagesFor } from '../lib/closeupModels.js';
 import { StoryModal } from './StoryModal.jsx';
@@ -69,6 +70,10 @@ export function PlantedScreen({ plantType, nickname, message, notice, onAgain, a
           再種一株
         </button>
       </div>
+      {/* 不在投影牆前面的人，也能用手機看到自己的植物飛進花園、天空的文字雲跟留言條 */}
+      <Link className="planted__wall-link" to="/wall">
+        看投影牆：花園、文字雲與大家的留言 →
+      </Link>
       {secondsLeft !== null && !storyOpen && <p className="planted__countdown">{secondsLeft} 秒後回到首頁</p>}
 
       <StoryModal plant={storyOpen ? plant : null} onClose={() => setStoryOpen(false)} />
