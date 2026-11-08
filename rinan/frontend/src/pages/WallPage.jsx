@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient.js';
 import { plantById } from '../lib/plants.js';
 import { buildCloud } from '../lib/wordCloud.js';
@@ -9,6 +10,7 @@ import { JoinCard } from '../components/JoinCard.jsx';
 import { MessageTicker } from '../components/MessageTicker.jsx';
 import { BackgroundMusic } from '../components/BackgroundMusic.jsx';
 import { PlantSearch } from '../components/PlantSearch.jsx';
+import { linkedPlantingId } from '../lib/plantingLink.js';
 
 const WALL_LIMIT = 300; // 牆上同時長最新的 300 株，再多畫面會擠成一團
 const POLL_MS = 10000; // 即時通道之外的保底同步：漏接的新植株、後台下架的植株都靠這個對齊
@@ -21,6 +23,8 @@ function byCreatedAt(a, b) {
 }
 
 export function WallPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedPlantId = linkedPlantingId(searchParams);
   const stageRef = useRef(null);
   const canvasRef = useRef(null);
   const overlayRef = useRef(null);
@@ -280,7 +284,7 @@ export function WallPage() {
     return () => { cancelled = true; clearInterval(timer); };
   }, [locatedEntry?.id]);
 
-  async function locatePlant(entry) {
+  const locatePlant = useCallback(async (entry) => {
     const request = ++locateRequestRef.current;
     setLocating(true);
     setLocationError('');
@@ -296,6 +300,11 @@ export function WallPage() {
       setHoveredPlant(null);
       setStoryEntry(null);
       setLocatedEntry(result.data);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set('plant', result.data.id);
+        return next;
+      }, { replace: true });
       return true;
     } catch {
       if (request === locateRequestRef.current) setLocationError('暫時無法定位，請再試一次。');
@@ -303,13 +312,22 @@ export function WallPage() {
     } finally {
       if (request === locateRequestRef.current) setLocating(false);
     }
-  }
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if (requestedPlantId && requestedPlantId !== locatedEntry?.id) locatePlant({ id: requestedPlantId });
+  }, [requestedPlantId, locatedEntry?.id, locatePlant]);
 
   function clearLocation() {
     locateRequestRef.current += 1;
     setLocatedEntry(null);
     setLocating(false);
     setLocationError('');
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('plant');
+      return next;
+    }, { replace: true });
   }
 
   const landed = useMemo(() => (rows ?? []).filter((r) => !flyingIds.has(r.id)), [rows, flyingIds]);
@@ -328,7 +346,7 @@ export function WallPage() {
       <div className="wall__hud">
         <header className="wall__header">
           <span className="wall__eyebrow">TO AND FROM｜往返．日南稻站</span>
-          <h1>Grounded in Rinan｜日南生根</h1>
+          <h1><span className="wall__title-en">Grounded in Rinan</span><span>日南生根</span></h1>
           <p>
             {shownTotal === null ? (
               '花園甦醒中…'

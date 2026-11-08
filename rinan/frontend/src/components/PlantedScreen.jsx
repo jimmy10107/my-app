@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { plantById } from '../lib/plants.js';
 import { closeupStagesFor } from '../lib/closeupModels.js';
 import { StoryModal } from './StoryModal.jsx';
+import { PlantShareButton } from './PlantShareButton.jsx';
+import { wallPathForPlanting } from '../lib/plantingLink.js';
 
 const STILL_MS = 2400; // 跟讀故事彈窗的生長 flipbook 同一個節奏：每張停一下，交叉淡入
 const SPROUT_STAGES = 3; // 幼苗 → 生長 → 盛開，不放凋萎（剛種下的不該看到它枯掉）
 
 // 種下之後的畫面（Play 與 Kiosk 共用）：用預先渲染的生長靜態圖播一段發芽，
 // 提醒抬頭看投影牆——同一時間，牆上的種子正從 QR 卡片飛進花園。
-export function PlantedScreen({ plantType, nickname, message, notice, onAgain, autoReturnSeconds }) {
+export function PlantedScreen({ plantType, plantingId, nickname, message, notice, onAgain, autoReturnSeconds }) {
   const plant = plantById(plantType);
-  const stills = (closeupStagesFor(plantType) ?? []).slice(0, SPROUT_STAGES).map((s) => s.still);
+  const stages = (closeupStagesFor(plantType) ?? []).slice(0, SPROUT_STAGES);
+  const stills = stages.map((stage) => stage.still);
+  const stillsRef = useRef([]);
   const [frame, setFrame] = useState(0);
   const [storyOpen, setStoryOpen] = useState(false);
+  const [sharingPhoto, setSharingPhoto] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(autoReturnSeconds ?? null);
 
   useEffect(() => {
@@ -24,7 +29,7 @@ export function PlantedScreen({ plantType, nickname, message, notice, onAgain, a
 
   // 現場平板：沒人操作一段時間就自動回到表單，給下一位訪客
   useEffect(() => {
-    if (!autoReturnSeconds || storyOpen) return undefined;
+    if (!autoReturnSeconds || storyOpen || sharingPhoto) return undefined;
     const deadline = Date.now() + autoReturnSeconds * 1000;
     setSecondsLeft(autoReturnSeconds);
     const timer = setInterval(() => {
@@ -37,7 +42,7 @@ export function PlantedScreen({ plantType, nickname, message, notice, onAgain, a
       }
     }, 500);
     return () => clearInterval(timer);
-  }, [autoReturnSeconds, storyOpen, onAgain]);
+  }, [autoReturnSeconds, storyOpen, sharingPhoto, onAgain]);
 
   return (
     <div className="page planted">
@@ -46,7 +51,8 @@ export function PlantedScreen({ plantType, nickname, message, notice, onAgain, a
       <div className="planted__stage" aria-hidden="true">
         <div className="planted__halo" />
         {stills.map((src, i) => (
-          <img key={src} src={src} alt="" className={`planted__still${i === frame ? ' is-active' : ''}`} />
+          <img key={src} src={src} alt="" ref={(image) => { stillsRef.current[i] = image; }}
+            className={`planted__still${i === frame ? ' is-active' : ''}`} />
         ))}
       </div>
 
@@ -62,6 +68,14 @@ export function PlantedScreen({ plantType, nickname, message, notice, onAgain, a
         </figcaption>
       </figure>
 
+      <Link className="planted__wall-link" to={wallPathForPlanting(plantingId)}>
+        {plantingId ? '在牆上定位我的植物 →' : '看整座花園 →'}
+      </Link>
+      <PlantShareButton plant={plant} displayName={nickname} onSharingChange={setSharingPhoto}
+        capturePlant={() => {
+          const image = stillsRef.current[frame];
+          return image?.complete && image.naturalWidth ? { image, stageLabel: stages[frame].stageLabel } : null;
+        }} />
       <div className="planted__actions">
         <button type="button" className="planted__secondary" onClick={() => setStoryOpen(true)}>
           讀{plant?.name}的故事
@@ -70,11 +84,7 @@ export function PlantedScreen({ plantType, nickname, message, notice, onAgain, a
           再種一株
         </button>
       </div>
-      {/* 不在投影牆前面的人，也能用手機看到自己的植物飛進花園、天空的文字雲跟留言條 */}
-      <Link className="planted__wall-link" to="/wall">
-        看投影牆：花園、文字雲與大家的留言 →
-      </Link>
-      {secondsLeft !== null && !storyOpen && <p className="planted__countdown">{secondsLeft} 秒後回到首頁</p>}
+      {secondsLeft !== null && !storyOpen && !sharingPhoto && <p className="planted__countdown">{secondsLeft} 秒後回到首頁</p>}
 
       <StoryModal plant={storyOpen ? plant : null} displayName={nickname} onClose={() => setStoryOpen(false)} />
     </div>

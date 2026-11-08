@@ -37,8 +37,8 @@ export function KioskPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const { notice } = await api.submitPlanting({ kioskSessionId: sessionId, plantType, message, nickname });
-      setResult({ notice, plantType, message: message.trim(), nickname });
+      const { notice, planting } = await api.submitPlanting({ kioskSessionId: sessionId, plantType, message, nickname });
+      setResult({ notice, plantType, message: message.trim(), nickname, plantingId: planting?.id });
     } catch (err) {
       setError(err.message);
     } finally {

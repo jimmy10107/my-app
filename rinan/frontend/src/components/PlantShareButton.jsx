@@ -4,7 +4,7 @@ import { JOIN_URL } from '../lib/joinUrl.js';
 import { closeupStagesFor } from '../lib/closeupModels.js';
 import { canSharePlantPhoto, createPlantShareCanvas, loadShareImage, plantShareDetails, pngDataUrlToFile } from '../lib/plantShare.js';
 
-export function PlantShareButton({ plant, displayName, capturePlant }) {
+export function PlantShareButton({ plant, displayName, capturePlant, onSharingChange }) {
   const [assets, setAssets] = useState(null);
   const [preparingError, setPreparingError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -12,6 +12,8 @@ export function PlantShareButton({ plant, displayName, capturePlant }) {
   const [preview, setPreview] = useState(null);
   const [status, setStatus] = useState('');
   const details = plantShareDetails(plant, displayName, JOIN_URL);
+
+  useEffect(() => { onSharingChange?.(sharing); }, [sharing, onSharingChange]);
 
   useEffect(() => () => {
     if (preview?.downloadUrl) URL.revokeObjectURL(preview.downloadUrl);

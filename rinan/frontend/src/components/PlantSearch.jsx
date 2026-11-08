@@ -86,7 +86,10 @@ export function PlantSearch({ rows, selectedEntry, locating, locationError, onLo
       {locating && <p className="plant-search__feedback" role="status">正在定位植物…</p>}
       {locationError && <p className="plant-search__feedback" role="alert">{locationError}</p>}
       {selectedEntry && <div className="plant-search__selection">
-        <span role="status">已定位 · {selectedEntry.display_name || '日南的一位朋友'}的{plantById(selectedEntry.plant_type)?.name}</span>
+        <span className="plant-search__selected-name" role="status"
+          title={`${selectedEntry.display_name || '日南的一位朋友'}的${plantById(selectedEntry.plant_type)?.name}`}>
+          已定位 · {selectedEntry.display_name || '日南的一位朋友'}的{plantById(selectedEntry.plant_type)?.name}
+        </span>
         <div><button type="button" onClick={() => onReadStory(selectedEntry)}>看植物簡介</button>
           <button type="button" onClick={onClear}>回到整座花園</button></div>
       </div>}

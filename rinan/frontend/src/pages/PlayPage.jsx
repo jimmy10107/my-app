@@ -39,8 +39,8 @@ export function PlayPage() {
     setError(null);
     try {
       const accessToken = getAccessToken();
-      const { notice } = await api.submitPlanting({ accessToken, plantType, message, nickname });
-      setResult({ notice, plantType, message: message.trim(), nickname });
+      const { notice, planting } = await api.submitPlanting({ accessToken, plantType, message, nickname });
+      setResult({ notice, plantType, message: message.trim(), nickname, plantingId: planting?.id });
     } catch (err) {
       setError(err.message);
     } finally {
