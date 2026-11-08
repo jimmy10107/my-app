@@ -36,7 +36,7 @@ export function WallPage() {
   const [freshIds, setFreshIds] = useState(() => new Set());
   const [launching, setLaunching] = useState(false);
   const [offline, setOffline] = useState(false);
-  const [storyPlant, setStoryPlant] = useState(null);
+  const [storyEntry, setStoryEntry] = useState(null);
   const [hoveredPlant, setHoveredPlant] = useState(null);
 
   // Three.js 場景只建立一次；資料更新時用 setEntries() 局部同步，
@@ -56,7 +56,7 @@ export function WallPage() {
       overlay: overlayRef.current,
       onSelect: (entryId) => {
         const row = rowsRef.current.find((p) => p.id === entryId);
-        if (row) setStoryPlant(plantById(row.plant_type));
+        if (row) setStoryEntry(row);
       },
       onHover: (entryId, point) => {
         if (!entryId || !point) {
@@ -267,7 +267,11 @@ export function WallPage() {
         <BackgroundMusic />
       </div>
 
-      <StoryModal plant={storyPlant} onClose={() => setStoryPlant(null)} />
+      <StoryModal
+        plant={storyEntry ? plantById(storyEntry.plant_type) : null}
+        displayName={storyEntry?.display_name?.trim() || '日南的一位朋友'}
+        onClose={() => setStoryEntry(null)}
+      />
     </div>
   );
 }

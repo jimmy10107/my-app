@@ -1,7 +1,8 @@
 import { PlantCloseupViewer } from './PlantCloseupViewer.jsx';
 
-export function StoryModal({ plant, onClose }) {
+export function StoryModal({ plant, displayName, onClose }) {
   if (!plant) return null;
+  const planterName = displayName?.trim();
   return (
     <div className="story-modal" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="story-card">
@@ -12,7 +13,7 @@ export function StoryModal({ plant, onClose }) {
         <div className="story-head">
           <div>
             <div className="story-role">{plant.role}</div>
-            <div className="story-name">{plant.name}</div>
+            <div className="story-name">{planterName ? `${planterName}的${plant.name}` : plant.name}</div>
             <div className="story-meaning">象徵｜{plant.meaning}</div>
           </div>
         </div>

@@ -76,7 +76,7 @@ export function PlantedScreen({ plantType, nickname, message, notice, onAgain, a
       </Link>
       {secondsLeft !== null && !storyOpen && <p className="planted__countdown">{secondsLeft} 秒後回到首頁</p>}
 
-      <StoryModal plant={storyOpen ? plant : null} onClose={() => setStoryOpen(false)} />
+      <StoryModal plant={storyOpen ? plant : null} displayName={nickname} onClose={() => setStoryOpen(false)} />
     </div>
   );
 }
