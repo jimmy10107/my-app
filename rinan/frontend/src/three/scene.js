@@ -19,6 +19,32 @@ const RING_MS = 2600;
 const MAX_FLYING = 8; // 同時最多幾株走飛入動畫；斷線很久一次補進很多筆時，其餘直接冒出來
 const LAUNCH_GAP_MS = 900; // 同一批進來的植株錯開起飛
 
+// 作物以群落呈現，讓稻株與河床甜根子草在整片植生裡保有清楚輪廓。
+const SPECIES_PRESENTATION = {
+  rice: {
+    scale: 1.55,
+    innerRadius: 0.95,
+    outerRadius: GARDEN_RADIUS,
+    brightness: 1.1,
+    clump: [
+      { x: -0.22, z: 0.12, scale: 0.78 },
+      { x: 0.2, z: 0.1, scale: 0.82 },
+      { x: -0.08, z: -0.2, scale: 0.72 },
+    ],
+  },
+  miscanthus: {
+    scale: 1.38,
+    innerRadius: 1.25,
+    outerRadius: GARDEN_RADIUS,
+    brightness: 1.08,
+    clump: [
+      { x: -0.26, z: 0.08, scale: 0.82 },
+      { x: 0.24, z: -0.06, scale: 0.76 },
+    ],
+  },
+  taro: { scale: 1.08, innerRadius: 0.7, outerRadius: 2.25, brightness: 1.02 },
+};
+
 const ORANGE = '#D99531';
 
 // 真實植株從 20cm 秧苗到 8m 的木麻黃都有，直接照比例放上牆，大樹會把整座花園蓋掉；
@@ -287,12 +313,14 @@ export class GardenScene {
    * @param {object} options
    * @param {HTMLCanvasElement} options.overlay 疊在上面的 2D 畫布（飛入動畫、名字標籤）
    * @param {(id: string) => void} [options.onSelect] 點了某一株
+   * @param {(id: string | null, point?: {x: number, y: number}) => void} [options.onHover] 游標停在或移開一株
    * @param {(row: object) => void} [options.onLaunch] 新的一株從 QR 卡片起飛
    * @param {(row: object) => void} [options.onLanded] 新的一株落地發芽
    */
-  constructor(canvas, { overlay, onSelect, onLaunch, onLanded } = {}) {
+  constructor(canvas, { overlay, onSelect, onHover, onLaunch, onLanded } = {}) {
     this.canvas = canvas;
     this.onSelect = onSelect;
+    this.onHover = onHover;
     this.onLaunch = onLaunch;
     this.onLanded = onLanded;
     this.entries = new Map();
@@ -416,7 +444,12 @@ export class GardenScene {
     );
     this.raycaster.setFromCamera(pointer, this.camera);
     const sprites = [];
-    this.entries.forEach((entry) => entry.stages.forEach((s) => s.sprite.visible && sprites.push(s.sprite)));
+    this.entries.forEach((entry) =>
+      entry.stages.forEach((s) => {
+        if (s.sprite.visible) sprites.push(s.sprite);
+        s.clumpSprites.forEach((sprite) => sprite.visible && sprites.push(sprite));
+      })
+    );
     const hits = this.raycaster.intersectObjects(sprites, false);
     if (hits.length === 0) return null;
     // 在多張重疊的 sprite 中，挑基部最靠近點擊位置的那株，避免大樹透明的外框搶走點擊。
@@ -440,10 +473,18 @@ export class GardenScene {
       if (id && this.onSelect) this.onSelect(id);
     };
     this._handleMove = (event) => {
-      this.canvas.style.cursor = this._pick(event) ? 'pointer' : '';
+      const id = this._pick(event);
+      this.canvas.style.cursor = id ? 'pointer' : '';
+      const rect = this.canvas.getBoundingClientRect();
+      this.onHover?.(id, id ? { x: event.clientX - rect.left, y: event.clientY - rect.top } : null);
+    };
+    this._handleLeave = () => {
+      this.canvas.style.cursor = '';
+      this.onHover?.(null, null);
     };
     this.canvas.addEventListener('click', this._handleClick);
     this.canvas.addEventListener('pointermove', this._handleMove);
+    this.canvas.addEventListener('pointerleave', this._handleLeave);
   }
 
   // 飛入動畫的起點（QR 卡片），座標是相對於畫布左上角的 CSS 像素
@@ -474,9 +515,9 @@ export class GardenScene {
     cam.aspect = aspect;
     cam.fov = lerp(34, 52, k);
     const shiftDown = lerp(0.1, 0.08, k) * this.height;
-    // 寬螢幕往左挪一點，右下角的參加卡比較不會擋到前排植株
-    const shiftLeft = lerp(0.05, 0, k) * this.width;
-    cam.setViewOffset(this.width, this.height, shiftLeft, -shiftDown, this.width, this.height);
+    // 寬螢幕往右留白，讓左下角的參加卡不會擋到前排植株
+    const shiftRight = lerp(-0.05, 0, k) * this.width;
+    cam.setViewOffset(this.width, this.height, shiftRight, -shiftDown, this.width, this.height);
     cam.updateProjectionMatrix();
 
     const elevation = THREE.MathUtils.degToRad(lerp(23, 36, k));
@@ -518,9 +559,11 @@ export class GardenScene {
     this.camera.updateMatrixWorld();
   }
 
-  _positionFor(id) {
+  _positionFor(id, presentation = {}) {
     const a = hashToUnit(id, 1) * Math.PI * 2;
-    const r = 0.25 + Math.sqrt(hashToUnit(id, 2)) * (GARDEN_RADIUS - 0.25);
+    const inner = presentation.innerRadius ?? 0.35;
+    const outer = presentation.outerRadius ?? 2.15;
+    const r = Math.sqrt(inner * inner + hashToUnit(id, 2) * (outer * outer - inner * inner));
     return { x: Math.cos(a) * r, z: Math.sin(a) * r };
   }
 
@@ -574,18 +617,22 @@ export class GardenScene {
     const plant = plantById(row.plant_type);
     const spriteDefs = PLANT_SPRITES[row.plant_type];
     if (!plant || !spriteDefs) return;
-    const pos = this._positionFor(row.id);
+    const presentation = SPECIES_PRESENTATION[row.plant_type] ?? {};
+    const pos = this._positionFor(row.id, presentation);
     const root = new THREE.Group();
     root.position.set(pos.x, 0, pos.z);
+    root.rotation.y = hashToUnit(row.id, 4) * Math.PI * 2;
     root.userData.entryId = row.id;
 
     // 越靠近花園中央越亮（像站點的燈照著），外圈稍暗，畫面自然有景深
     const radial = Math.hypot(pos.x, pos.z) / GARDEN_RADIUS;
-    const tint = new THREE.Color(1, 0.985, 0.95).multiplyScalar(lerp(1.04, 0.84, radial * radial));
+    const tint = new THREE.Color(1, 0.985, 0.95)
+      .multiplyScalar(lerp(1.04, 0.84, radial * radial))
+      .multiplyScalar(presentation.brightness ?? 1);
 
     const stages = spriteDefs.map((def) => {
       const record = this._texture(def.file);
-      const k = gardenHeight(def.size[1]) / def.size[1];
+      const k = (gardenHeight(def.size[1]) / def.size[1]) * (presentation.scale ?? 1);
       const width = def.size[0] * k;
       const height = def.size[1] * k;
 
@@ -601,6 +648,17 @@ export class GardenScene {
       sprite.renderOrder = 2;
       sprite.visible = false;
       root.add(sprite);
+
+      const clumpSprites = (presentation.clump ?? []).map((part) => {
+        const clumpSprite = new THREE.Sprite(material);
+        clumpSprite.scale.set(width * part.scale, height * part.scale, 1);
+        clumpSprite.center.set(def.anchor[0], def.anchor[1]);
+        clumpSprite.position.set(part.x, 0, part.z);
+        clumpSprite.renderOrder = 2;
+        clumpSprite.visible = false;
+        root.add(clumpSprite);
+        return clumpSprite;
+      });
 
       const shadowMaterial = new THREE.ShaderMaterial({
         vertexShader: castShadowVertex,
@@ -622,7 +680,7 @@ export class GardenScene {
       shadow.visible = false;
       root.add(shadow);
 
-      return { sprite, material, shadow, shadowMaterial, record, width, height };
+      return { sprite, clumpSprites, material, shadow, shadowMaterial, record, width, height };
     });
 
     const blobMaterial = new THREE.ShaderMaterial({
@@ -645,10 +703,14 @@ export class GardenScene {
       stages,
       blob,
       phase: hashToUnit(row.id, 3) * Math.PI * 2,
-      cycleSeconds: plant.cycleSeconds,
+      variationScale: lerp(0.8, 1.24, hashToUnit(row.id, 5)),
+      cycleSeconds: plant.cycleSeconds * lerp(0.84, 1.16, hashToUnit(row.id, 6)),
       // 剛種下的：從落地那一刻起算，而且直接是完整的幼苗（不用等十幾秒慢慢淡入）；
       // 時間用這台電腦自己的時鐘，不受牆面電腦跟資料庫時間差影響。
-      createdAtMs: fresh ? appearAt - SEEDLING_FRACTION * cycleMs : new Date(row.created_at).getTime(),
+      // 開機時替每株錯開固定的週期起點，同一時間種下的一批也不會一起長、一起凋零。
+      createdAtMs: fresh
+        ? appearAt - SEEDLING_FRACTION * cycleMs
+        : new Date(row.created_at).getTime() - hashToUnit(row.id, 7) * cycleMs,
       launchAt: mode === 'fly' ? launchAt : null,
       appearAt,
       launched: mode !== 'fly',
@@ -737,7 +799,7 @@ export class GardenScene {
       const g = growthState(entry.cycleSeconds, entry.createdAtMs, nowMs);
       // 各階段圖本身就一階比一階大，root 只做輕微的縮放，避免幼苗小到看不見。
       const pop = sinceAppear < POP_MS ? Math.max(0, easeOutBack(sinceAppear / POP_MS)) : 1;
-      const scale = (0.4 + 0.6 * g.scale) * pop;
+      const scale = (0.4 + 0.6 * g.scale) * entry.variationScale * pop;
       entry.root.scale.setScalar(Math.max(scale, 0.0001));
       const sway = Math.sin(elapsed * 0.7 + entry.phase) * 0.025 + Math.sin(elapsed * 1.9 + entry.phase) * 0.008;
 
@@ -749,12 +811,15 @@ export class GardenScene {
         else if (stage === g.formB) op = g.formT * g.opacity;
         const visible = op > 0.004 && s.record.ready;
         s.sprite.visible = visible;
+        s.clumpSprites.forEach((sprite) => {
+          sprite.visible = visible;
+        });
         s.material.opacity = op;
         s.material.rotation = sway;
         s.shadow.visible = visible;
         s.shadowMaterial.uniforms.uOpacity.value = op * 0.8;
         s.shadowMaterial.uniforms.uRotation.value = sway;
-        shadowWidth += s.width * op;
+        shadowWidth += s.width * (1 + s.clumpSprites.length * 0.55) * op;
         if (op > 0.3) height = Math.max(height, s.height);
       });
       entry.height = Math.max(0.2, height) * entry.root.scale.x;
@@ -841,6 +906,7 @@ export class GardenScene {
     if (this._raf) cancelAnimationFrame(this._raf);
     this.canvas.removeEventListener('click', this._handleClick);
     this.canvas.removeEventListener('pointermove', this._handleMove);
+    this.canvas.removeEventListener('pointerleave', this._handleLeave);
     Array.from(this.entries.keys()).forEach((id) => this._removeEntry(id));
     this.textures.forEach((record) => record.texture.dispose());
     this.unitPlane.dispose();

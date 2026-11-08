@@ -180,7 +180,7 @@ textarea {
   margin-top: 0.2rem;
 }
 
-/* Wall：整面都是 3D 花園。天空飄著留言文字雲，右下角是掃碼參加卡，底部一條細細的留言條。
+/* Wall：整面都是 3D 花園。天空飄著留言文字雲，左下角是掃碼參加卡，底部一條細細的留言條。
    字級用 vh 計算，1080p 投影跟 4K 投影看起來比例一樣。 */
 .wall {
   position: fixed;
@@ -335,10 +335,10 @@ textarea {
   }
 }
 
-/* 右下角掃碼參加卡 */
+/* 左下角掃碼參加卡 */
 .join-card {
   position: absolute;
-  right: 2.4vw;
+  left: 2.4vw;
   bottom: calc(max(46px, 6.2vh) + 2.4vh);
   display: flex;
   align-items: center;
@@ -354,6 +354,44 @@ textarea {
     0 0 0 1px rgba(246, 242, 232, 0.6);
   pointer-events: auto;
   transition: box-shadow 400ms ease, transform 400ms ease;
+}
+
+.wall__plant-tooltip {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 11rem;
+  padding: 0.6rem 0.85rem;
+  color: var(--ink);
+  background: rgba(246, 242, 232, 0.96);
+  border: 1px solid rgba(246, 242, 232, 0.82);
+  border-radius: 0.75rem;
+  box-shadow: 0 0.6rem 2rem rgba(10, 16, 24, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.25rem);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+}
+
+.wall__plant-tooltip--visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.wall__plant-tooltip span {
+  font-size: max(0.7rem, 1.05vh);
+  line-height: 1.35;
+  color: #5b5446;
+}
+
+.wall__plant-tooltip strong {
+  font-family: 'Noto Serif TC', serif;
+  font-size: max(1rem, 1.7vh);
+  line-height: 1.25;
+  color: var(--ink);
 }
 
 .join-card--pulse {

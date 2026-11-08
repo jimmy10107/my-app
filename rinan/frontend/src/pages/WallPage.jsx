@@ -23,9 +23,11 @@ export function WallPage() {
   const canvasRef = useRef(null);
   const overlayRef = useRef(null);
   const cardRef = useRef(null);
+  const tooltipRef = useRef(null);
   const sceneRef = useRef(null);
   const rowsRef = useRef([]);
   const prevIdsRef = useRef(null);
+  const hoveredIdRef = useRef(null);
 
   const [rows, setRows] = useState(null); // null：第一次讀取還沒回來
   const [total, setTotal] = useState(0);
@@ -34,6 +36,7 @@ export function WallPage() {
   const [launching, setLaunching] = useState(false);
   const [offline, setOffline] = useState(false);
   const [storyPlant, setStoryPlant] = useState(null);
+  const [hoveredPlant, setHoveredPlant] = useState(null);
 
   // Three.js 場景只建立一次；資料更新時用 setEntries() 局部同步，
   // 不重新建立整個 WebGL context（避免每次有人種下都重新編譯 shader）。
@@ -53,6 +56,30 @@ export function WallPage() {
       onSelect: (entryId) => {
         const row = rowsRef.current.find((p) => p.id === entryId);
         if (row) setStoryPlant(plantById(row.plant_type));
+      },
+      onHover: (entryId, point) => {
+        if (!entryId || !point) {
+          hoveredIdRef.current = null;
+          setHoveredPlant(null);
+          return;
+        }
+        const row = rowsRef.current.find((p) => p.id === entryId);
+        if (!row) return;
+        const stage = stageRef.current;
+        const tooltip = tooltipRef.current;
+        if (stage && tooltip) {
+          const left = Math.max(8, Math.min(point.x + 16, stage.clientWidth - 250));
+          const top = Math.max(8, Math.min(point.y + 16, stage.clientHeight - 88));
+          tooltip.style.left = `${left}px`;
+          tooltip.style.top = `${top}px`;
+        }
+        if (hoveredIdRef.current !== entryId) {
+          hoveredIdRef.current = entryId;
+          setHoveredPlant({
+            displayName: row.display_name || '日南的一位朋友',
+            plantName: plantById(row.plant_type)?.name || '植物',
+          });
+        }
       },
       onLaunch: () => {
         setLaunching(true);
@@ -224,6 +251,16 @@ export function WallPage() {
         </header>
 
         <WordCloud words={cloudWords} />
+        <div
+          className={`wall__plant-tooltip${hoveredPlant ? ' wall__plant-tooltip--visible' : ''}`}
+          ref={tooltipRef}
+          role="status"
+          aria-live="polite"
+        >
+          <span>種下這株的人</span>
+          <strong>{hoveredPlant?.displayName}</strong>
+          <span>{hoveredPlant?.plantName}</span>
+        </div>
         <JoinCard ref={cardRef} highlight={launching} />
         <MessageTicker entries={tickerEntries} />
       </div>
