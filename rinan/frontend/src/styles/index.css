@@ -254,6 +254,199 @@ textarea {
   color: #f0c27a;
 }
 
+/* 搜尋與定位：平時只保留小按鈕，找到植物後收起清單讓出花園。 */
+.plant-search {
+  position: absolute;
+  z-index: 12;
+  top: 3.4vh;
+  right: 2.6vw;
+  width: min(360px, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.plant-search button,
+.plant-search__panel,
+.plant-search__selection {
+  pointer-events: auto;
+}
+
+.plant-search__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.6rem 0.95rem;
+  color: var(--paper);
+  background: rgba(24, 31, 35, 0.88);
+  border: 1px solid rgba(246, 242, 232, 0.4);
+  box-shadow: 0 0.4rem 1.5rem rgba(10, 16, 24, 0.2);
+  font-size: 0.9rem;
+}
+
+.plant-search__toggle svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.plant-search__panel,
+.plant-search__selection,
+.plant-search__feedback {
+  width: 100%;
+  padding: 1rem;
+  border-radius: 16px;
+  color: var(--ink);
+  background: rgba(246, 242, 232, 0.98);
+  box-shadow: 0 0.7rem 2rem rgba(10, 16, 24, 0.25);
+}
+
+.plant-search__panel {
+  max-height: min(64vh, 580px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.plant-search__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+
+.plant-search__heading > button {
+  padding: 0.25rem;
+  width: 32px;
+  height: 32px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid rgba(24, 31, 35, 0.2);
+}
+
+.plant-search__panel label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+  color: #5b5446;
+}
+
+.plant-search__panel input {
+  width: 100%;
+  min-height: 44px;
+  color: var(--ink);
+  background: #fffdf8;
+  border: 1px solid #b7b0a3;
+  font-size: 1rem;
+}
+
+.plant-search :focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.plant-search__status,
+.plant-search__feedback {
+  margin: 0.7rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.plant-search__results {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.plant-search__results button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #d5ccbc;
+  color: var(--ink);
+  background: #fffdf8;
+  text-align: left;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.plant-search__results button:hover,
+.plant-search__results button[aria-pressed='true'] {
+  border-color: #a66c18;
+  background: #f8edd6;
+}
+
+.plant-search__results strong {
+  font-family: 'Noto Serif TC', serif;
+  font-size: 1rem;
+}
+
+.plant-search__message { font-size: 0.85rem; }
+.plant-search__time { font-size: 0.72rem; color: #665d4e; }
+.plant-search__selection { font-size: 0.85rem; overflow-wrap: anywhere; }
+.plant-search__selection > div { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+.plant-search__selection button { min-height: 40px; padding: 0.45rem 0.75rem; font-size: 0.78rem; }
+
+.wall__located-marker {
+  position: absolute;
+  z-index: 9;
+  visibility: hidden;
+}
+
+.wall__located-ring {
+  position: absolute;
+  width: 70px;
+  height: 25px;
+  border: 3px solid #ffd280;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 20px #e6aa4c, inset 0 0 12px rgba(230, 170, 76, 0.6);
+  animation: located-glow 1.8s ease-in-out infinite;
+}
+
+.wall__located-line {
+  position: absolute;
+  bottom: 12px;
+  height: var(--plant-height, 50px);
+  border-left: 1px dashed rgba(255, 210, 128, 0.85);
+}
+
+.wall__located-marker button {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--plant-height, 50px) + 16px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(280px, calc(100vw - 2rem));
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #ffd280;
+  border-radius: 12px;
+  color: #fff6e1;
+  background: rgba(29, 24, 20, 0.94);
+  box-shadow: 0 0 20px rgba(230, 170, 76, 0.35);
+  font-family: 'Noto Serif TC', serif;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+
+@keyframes located-glow {
+  50% { box-shadow: 0 0 30px #e6aa4c, inset 0 0 18px rgba(230, 170, 76, 0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall__located-ring { animation: none; }
+}
+
 /* 天空文字雲：位置由 WordCloud 排好，這裡只管顏色、光暈跟漂浮 */
 .word-cloud {
   position: absolute;
@@ -618,6 +811,15 @@ textarea {
 
   .wall__header h1 {
     font-size: 1.3rem;
+  }
+
+  .plant-search {
+    top: 7.2rem;
+    right: 1rem;
+  }
+
+  .plant-search__panel {
+    max-height: calc(100dvh - 17rem);
   }
 
   .word-cloud {

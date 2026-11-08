@@ -8,6 +8,7 @@ import { WordCloud } from '../components/WordCloud.jsx';
 import { JoinCard } from '../components/JoinCard.jsx';
 import { MessageTicker } from '../components/MessageTicker.jsx';
 import { BackgroundMusic } from '../components/BackgroundMusic.jsx';
+import { PlantSearch } from '../components/PlantSearch.jsx';
 
 const WALL_LIMIT = 300; // 牆上同時長最新的 300 株，再多畫面會擠成一團
 const POLL_MS = 10000; // 即時通道之外的保底同步：漏接的新植株、後台下架的植株都靠這個對齊
@@ -29,6 +30,8 @@ export function WallPage() {
   const rowsRef = useRef([]);
   const prevIdsRef = useRef(null);
   const hoveredIdRef = useRef(null);
+  const locationMarkerRef = useRef(null);
+  const locateRequestRef = useRef(0);
 
   const [rows, setRows] = useState(null); // null：第一次讀取還沒回來
   const [total, setTotal] = useState(0);
@@ -38,6 +41,9 @@ export function WallPage() {
   const [offline, setOffline] = useState(false);
   const [storyEntry, setStoryEntry] = useState(null);
   const [hoveredPlant, setHoveredPlant] = useState(null);
+  const [locatedEntry, setLocatedEntry] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
 
   // Three.js 場景只建立一次；資料更新時用 setEntries() 局部同步，
   // 不重新建立整個 WebGL context（避免每次有人種下都重新編譯 shader）。
@@ -57,6 +63,15 @@ export function WallPage() {
       onSelect: (entryId) => {
         const row = rowsRef.current.find((p) => p.id === entryId);
         if (row) setStoryEntry(row);
+      },
+      onFocusPosition: (point) => {
+        const marker = locationMarkerRef.current;
+        if (!marker) return;
+        marker.style.visibility = point ? 'visible' : 'hidden';
+        if (!point) return;
+        marker.style.left = `${point.x}px`;
+        marker.style.top = `${point.y}px`;
+        marker.style.setProperty('--plant-height', `${Math.max(20, point.y - point.topY)}px`);
       },
       onHover: (entryId, point) => {
         if (!entryId || !point) {
@@ -128,6 +143,7 @@ export function WallPage() {
       timers.forEach(clearTimeout);
       scene.dispose();
       sceneRef.current = null;
+      locateRequestRef.current += 1;
     };
   }, []);
 
@@ -206,21 +222,95 @@ export function WallPage() {
   }, []);
 
   useEffect(() => {
-    if (!rows) return;
-    rowsRef.current = rows;
+    if (!rows && !locatedEntry) return;
+    const visibleRows = rows ?? [];
+    // 搜尋到較早的紀錄時暫時帶回花園，不改動總數、文字雲或新種植動畫。
+    const gardenRows = locatedEntry && !visibleRows.some((row) => row.id === locatedEntry.id)
+      ? [...visibleRows, locatedEntry] : visibleRows;
+    rowsRef.current = gardenRows;
     // 開機時已經在牆上的植株直接長好；之後才出現的會先飛進花園，落地之後
     // 才算數（文字雲、留言條、總數都等落地那一刻才更新，畫面上的順序才對得起來）。
-    const ids = new Set(rows.map((r) => r.id));
-    const newIds = prevIdsRef.current === null ? [] : [...ids].filter((id) => !prevIdsRef.current.has(id));
-    prevIdsRef.current = ids;
+    const ids = new Set(visibleRows.map((r) => r.id));
+    const firstLoad = prevIdsRef.current === null;
+    const newIds = firstLoad ? [] : [...ids].filter((id) => !prevIdsRef.current.has(id));
+    if (rows) prevIdsRef.current = ids;
     // 還在飛就被下架的植株永遠不會落地，順手從清單拿掉
     setFlyingIds((prev) => {
       const kept = [...prev].filter((id) => ids.has(id));
       if (newIds.length === 0 && kept.length === prev.size) return prev;
       return new Set([...kept, ...newIds]);
     });
-    sceneRef.current?.setEntries(rows);
-  }, [rows]);
+    sceneRef.current?.setEntries(gardenRows, {
+      existingIds: new Set(firstLoad ? gardenRows.map((row) => row.id) : locatedEntry ? [locatedEntry.id] : []),
+    });
+  }, [rows, locatedEntry]);
+
+  useEffect(() => {
+    sceneRef.current?.focusEntry(locatedEntry?.id ?? null);
+  }, [locatedEntry]);
+
+  // 較早的搜尋結果不在最新 300 株裡，也要遵守後台下架及更名的同步。
+  useEffect(() => {
+    const id = locatedEntry?.id;
+    if (!id) return undefined;
+    let cancelled = false;
+    let inflight = false;
+    const timer = setInterval(async () => {
+      if (inflight || document.visibilityState === 'hidden') return;
+      inflight = true;
+      try {
+        const { data, error } = await supabase.from('plantings').select(COLUMNS)
+          .eq('id', id).eq('status', 'approved').maybeSingle();
+        if (cancelled || error) return;
+        if (!data) {
+          setLocatedEntry((current) => current?.id === id ? null : current);
+          setStoryEntry((current) => current?.id === id ? null : current);
+          setLocationError('這株植物目前未公開，請搜尋其他紀錄。');
+        } else {
+          setLocatedEntry((current) => current?.id === id &&
+            (current.display_name !== data.display_name || current.message !== data.message || current.plant_type !== data.plant_type)
+            ? data : current);
+        }
+      } catch {
+        // 暫時離線時保留目前定位，下次同步再確認公開狀態。
+      } finally {
+        inflight = false;
+      }
+    }, POLL_MS);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [locatedEntry?.id]);
+
+  async function locatePlant(entry) {
+    const request = ++locateRequestRef.current;
+    setLocating(true);
+    setLocationError('');
+    try {
+      const result = await supabase.from('plantings').select(COLUMNS)
+        .eq('id', entry.id).eq('status', 'approved').maybeSingle();
+      if (request !== locateRequestRef.current) return false;
+      if (result.error) throw result.error;
+      if (!result.data) {
+        setLocationError('這株植物目前未公開，請搜尋其他紀錄。');
+        return false;
+      }
+      setHoveredPlant(null);
+      setStoryEntry(null);
+      setLocatedEntry(result.data);
+      return true;
+    } catch {
+      if (request === locateRequestRef.current) setLocationError('暫時無法定位，請再試一次。');
+      return false;
+    } finally {
+      if (request === locateRequestRef.current) setLocating(false);
+    }
+  }
+
+  function clearLocation() {
+    locateRequestRef.current += 1;
+    setLocatedEntry(null);
+    setLocating(false);
+    setLocationError('');
+  }
 
   const landed = useMemo(() => (rows ?? []).filter((r) => !flyingIds.has(r.id)), [rows, flyingIds]);
   // 資料還沒回來前天空先空著：第一次排版就用真的資料，大詞才會在正中間
@@ -252,6 +342,15 @@ export function WallPage() {
         </header>
 
         <WordCloud words={cloudWords} />
+        <PlantSearch rows={rows ?? []} selectedEntry={locatedEntry} locating={locating}
+          locationError={locationError} onLocate={locatePlant} onClear={clearLocation} onReadStory={setStoryEntry} />
+        {locatedEntry && <div className="wall__located-marker" ref={locationMarkerRef}>
+          <span className="wall__located-ring" aria-hidden="true" />
+          <span className="wall__located-line" aria-hidden="true" />
+          <button type="button" onClick={() => setStoryEntry(locatedEntry)}>
+            {locatedEntry.display_name || '日南的一位朋友'}的{plantById(locatedEntry.plant_type)?.name}
+          </button>
+        </div>}
         <div
           className={`wall__plant-tooltip${hoveredPlant ? ' wall__plant-tooltip--visible' : ''}`}
           ref={tooltipRef}

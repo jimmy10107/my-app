@@ -317,10 +317,11 @@ export class GardenScene {
    * @param {(row: object) => void} [options.onLaunch] 新的一株從 QR 卡片起飛
    * @param {(row: object) => void} [options.onLanded] 新的一株落地發芽
    */
-  constructor(canvas, { overlay, onSelect, onHover, onLaunch, onLanded } = {}) {
+  constructor(canvas, { overlay, onSelect, onHover, onFocusPosition, onLaunch, onLanded } = {}) {
     this.canvas = canvas;
     this.onSelect = onSelect;
     this.onHover = onHover;
+    this.onFocusPosition = onFocusPosition;
     this.onLaunch = onLaunch;
     this.onLanded = onLanded;
     this.entries = new Map();
@@ -336,6 +337,10 @@ export class GardenScene {
     this._v = new THREE.Vector3();
     this._fwd = new THREE.Vector3();
     this._right = new THREE.Vector3();
+    this.focusedId = null;
+    this._lookTarget = new THREE.Vector3(0, 0.22, 0);
+    this._lookDesired = new THREE.Vector3();
+    this._cameraDesired = new THREE.Vector3();
 
     this.overlay = new ArrivalOverlay(overlay);
     this._initRenderer();
@@ -584,7 +589,7 @@ export class GardenScene {
    * 同步牆上的植株。第一次呼叫是開機時已經在牆上的那批（直接長好）；
    * 之後才出現的 id 都當成剛種下的：從 QR 卡片飛進來、落地發芽。
    */
-  setEntries(rows) {
+  setEntries(rows, { existingIds = new Set() } = {}) {
     const now = Date.now();
     const seen = new Set();
     let flying = 0;
@@ -595,7 +600,7 @@ export class GardenScene {
     rows.forEach((row) => {
       seen.add(row.id);
       if (this.entries.has(row.id)) return;
-      if (!this._primed) {
+      if (!this._primed || existingIds.has(row.id)) {
         this._addEntry(row, { mode: 'existing', now });
       } else if (flying < MAX_FLYING) {
         const launchAt = Math.max(now, this._nextLaunchAt);
@@ -611,6 +616,24 @@ export class GardenScene {
       if (!seen.has(id)) this._removeEntry(id);
     });
     this._primed = true;
+  }
+
+  // 定位以種植紀錄 id 為單位，同種植物也能找到正確的那一株。
+  focusEntry(id) {
+    const entry = id ? this.entries.get(id) : null;
+    this.focusedId = entry ? id : null;
+    this._focusAngle = this.baseAngle + (this._lastElapsed ?? 0) * 0.02;
+    if (entry && !entry.landed) {
+      const now = Date.now();
+      this.overlay.cancel(id);
+      entry.launched = true;
+      entry.appearAt = now - POP_MS;
+      entry.createdAtMs = now - SEEDLING_FRACTION * entry.cycleSeconds * 1000;
+      entry.landed = true;
+      this.onLanded?.(entry.row);
+    }
+    if (!entry) this.onFocusPosition?.(null);
+    return Boolean(entry);
   }
 
   _addEntry(row, { mode, now, launchAt = null }) {
@@ -797,6 +820,11 @@ export class GardenScene {
       entry.root.visible = true;
 
       const g = growthState(entry.cycleSeconds, entry.createdAtMs, nowMs);
+      const focused = this.focusedId === entry.row.id;
+      if (focused) {
+        g.opacity = Math.max(0.75, g.opacity);
+        g.scale = Math.max(0.65, g.scale);
+      }
       // 各階段圖本身就一階比一階大，root 只做輕微的縮放，避免幼苗小到看不見。
       const pop = sinceAppear < POP_MS ? Math.max(0, easeOutBack(sinceAppear / POP_MS)) : 1;
       const scale = (0.4 + 0.6 * g.scale) * entry.variationScale * pop;
@@ -811,8 +839,10 @@ export class GardenScene {
         else if (stage === g.formB) op = g.formT * g.opacity;
         const visible = op > 0.004 && s.record.ready;
         s.sprite.visible = visible;
+        s.sprite.renderOrder = focused ? 5 : 2;
         s.clumpSprites.forEach((sprite) => {
           sprite.visible = visible;
+          sprite.renderOrder = focused ? 5 : 2;
         });
         s.material.opacity = op;
         s.material.rotation = sway;
@@ -848,9 +878,23 @@ export class GardenScene {
   _updateCamera(elapsed) {
     const rig = this._rig;
     if (!rig) return;
-    const angle = this.baseAngle + elapsed * 0.02;
+    const focused = this.entries.get(this.focusedId);
+    const angle = focused ? this._focusAngle : this.baseAngle + elapsed * 0.02;
     const elevation = rig.elevation + Math.sin(elapsed * 0.11) * 0.012;
-    this._placeCamera(rig.distance, elevation, rig.targetY, angle);
+    const distance = focused ? THREE.MathUtils.clamp(rig.distance * 0.55, 3.2, 7) : rig.distance;
+    this._lookDesired.set(focused?.root.position.x ?? 0,
+      focused ? Math.max(0.25, focused.height * 0.5) : rig.targetY,
+      focused?.root.position.z ?? 0);
+    const flat = Math.cos(elevation) * distance;
+    this._cameraDesired.set(Math.cos(angle) * flat, Math.sin(elevation) * distance, Math.sin(angle) * flat)
+      .add(this._lookDesired);
+    const delta = Math.min(0.1, Math.max(0, elapsed - (this._lastElapsed ?? elapsed - 1 / 60)));
+    const damping = 1 - Math.exp(-delta * 8);
+    this.camera.position.lerp(this._cameraDesired, damping);
+    this._lookTarget.lerp(this._lookDesired, damping);
+    this.camera.lookAt(this._lookTarget);
+    this.camera.updateMatrixWorld();
+    this._lastElapsed = elapsed;
 
     // 影子方向跟著鏡頭：光固定從畫面右前上方來（跟植株圖預先渲染時的主光同一側）
     this.camera.getWorldDirection(this._fwd);
@@ -896,6 +940,8 @@ export class GardenScene {
       this._renderShadows();
       this.composer.render();
       this.overlay.draw(nowMs);
+      const focused = this.entries.get(this.focusedId);
+      if (focused) this.onFocusPosition?.(this._project(focused));
       this._raf = requestAnimationFrame(loop);
     };
     this._raf = requestAnimationFrame(loop);
