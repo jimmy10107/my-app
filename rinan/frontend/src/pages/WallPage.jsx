@@ -7,6 +7,7 @@ import { StoryModal } from '../components/StoryModal.jsx';
 import { WordCloud } from '../components/WordCloud.jsx';
 import { JoinCard } from '../components/JoinCard.jsx';
 import { MessageTicker } from '../components/MessageTicker.jsx';
+import { BackgroundMusic } from '../components/BackgroundMusic.jsx';
 
 const WALL_LIMIT = 300; // 牆上同時長最新的 300 株，再多畫面會擠成一團
 const POLL_MS = 10000; // 即時通道之外的保底同步：漏接的新植株、後台下架的植株都靠這個對齊
@@ -263,6 +264,7 @@ export function WallPage() {
         </div>
         <JoinCard ref={cardRef} highlight={launching} />
         <MessageTicker entries={tickerEntries} />
+        <BackgroundMusic />
       </div>
 
       <StoryModal plant={storyPlant} onClose={() => setStoryPlant(null)} />
