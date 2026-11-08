@@ -167,6 +167,17 @@ export class CloseupScene {
     this._raf = requestAnimationFrame(loop);
   }
 
+  captureFrame() {
+    if (this._destroyed || !this.model) return null;
+    // WebGL 預設會清除上一幀；立即重繪再複製，分享照片才能保留目前旋轉／縮放的角度。
+    this.renderer.render(this.scene, this.camera);
+    const image = document.createElement('canvas');
+    image.width = this.canvas.width;
+    image.height = this.canvas.height;
+    image.getContext('2d').drawImage(this.canvas, 0, 0);
+    return image;
+  }
+
   dispose() {
     // 模型幾何／貼圖來自模組層級的 gltfCache（同物種重複開故事彈窗會重用），
     // 這裡只清掉這個 viewer 自己的東西（renderer／controls／複製出來的 material），

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { CloseupScene, preloadGltf } from '../three/closeupScene.js';
 import { closeupStagesFor } from '../lib/closeupModels.js';
 
@@ -11,10 +11,11 @@ function zoneForSlider(value) {
   return Math.min(ZONE_COUNT - 1, Math.floor((value / 100) * ZONE_COUNT));
 }
 
-export function PlantCloseupViewer({ plantId }) {
+export const PlantCloseupViewer = forwardRef(function PlantCloseupViewer({ plantId }, ref) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
+  const stillsRef = useRef([]);
 
   const stages = closeupStagesFor(plantId);
 
@@ -25,6 +26,20 @@ export function PlantCloseupViewer({ plantId }) {
   const [modelStatus, setModelStatus] = useState('loading');
   const [progress, setProgress] = useState(0);
   const [retryTick, setRetryTick] = useState(0);
+
+  useImperativeHandle(ref, () => ({
+    captureFrame() {
+      const index = phase === 'intro' ? introFrame : activeZone;
+      if (phase === 'ready' && modelStatus === 'ready') {
+        try {
+          const image = sceneRef.current?.captureFrame();
+          if (image) return { image, stageLabel: stages[activeZone].stageLabel };
+        } catch { /* 無法擷取 3D 時使用目前階段的植物照片。 */ }
+      }
+      const image = stillsRef.current[index];
+      return image?.complete && image.naturalWidth ? { image, stageLabel: stages[index].stageLabel } : null;
+    },
+  }), [phase, introFrame, activeZone, modelStatus, stages]);
 
   // 四個階段的 glTF「一起」平行預載（不是點了才一個一個載），flipbook 至少播
   // MIN_INTRO_MS，全部載完（或超過 MAX_INTRO_MS 保底逾時）才會解鎖 3D／滑輪／縮放。
@@ -74,7 +89,9 @@ export function PlantCloseupViewer({ plantId }) {
     if (phase !== 'ready' || !stages) return undefined;
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
-    const scene = new CloseupScene(canvas);
+    let scene;
+    try { scene = new CloseupScene(canvas); }
+    catch { setModelStatus('unavailable'); return undefined; }
     sceneRef.current = scene;
     // 用 canvas 自己的 clientHeight（CSS 已經扣掉底部滑桿高度），
     // 不要用整個 wrapper 的高度，避免內部渲染解析度跟實際顯示尺寸對不上而變形。
@@ -97,6 +114,7 @@ export function PlantCloseupViewer({ plantId }) {
   useEffect(() => {
     if (phase !== 'ready' || !stages) return undefined;
     const scene = sceneRef.current;
+    if (!scene) return undefined;
     if (!scene) return undefined;
     const stage = stages[activeZone];
     let cancelled = false;
@@ -137,6 +155,7 @@ export function PlantCloseupViewer({ plantId }) {
         {stages.map((s, i) => (
           <img
             key={s.slot}
+            ref={(image) => { stillsRef.current[i] = image; }}
             src={s.still}
             alt=""
             className={`closeup-viewer__still${i === activeStillIndex ? ' is-active' : ''}`}
@@ -156,6 +175,9 @@ export function PlantCloseupViewer({ plantId }) {
       )}
       {phase === 'ready' && modelStatus === 'ready' && (
         <div className="closeup-viewer__tag">{stages[activeZone].stageLabel}．可拖曳旋轉／縮放</div>
+      )}
+      {phase === 'ready' && modelStatus === 'unavailable' && (
+        <div className="closeup-viewer__tag">先欣賞植物照片，也可以分享給朋友。</div>
       )}
 
       {phase === 'ready' ? (
@@ -186,4 +208,4 @@ export function PlantCloseupViewer({ plantId }) {
       )}
     </div>
   );
-}
+});

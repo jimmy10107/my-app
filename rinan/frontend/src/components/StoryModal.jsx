@@ -1,6 +1,9 @@
+import { useRef } from 'react';
 import { PlantCloseupViewer } from './PlantCloseupViewer.jsx';
+import { PlantShareButton } from './PlantShareButton.jsx';
 
 export function StoryModal({ plant, displayName, onClose }) {
+  const viewerRef = useRef(null);
   if (!plant) return null;
   const planterName = displayName?.trim();
   return (
@@ -9,7 +12,7 @@ export function StoryModal({ plant, displayName, onClose }) {
         <button type="button" className="story-close" onClick={onClose} aria-label="關閉">
           ✕
         </button>
-        <PlantCloseupViewer plantId={plant.id} />
+        <PlantCloseupViewer key={plant.id} plantId={plant.id} ref={viewerRef} />
         <div className="story-head">
           <div>
             <div className="story-role">{plant.role}</div>
@@ -17,6 +20,8 @@ export function StoryModal({ plant, displayName, onClose }) {
             <div className="story-meaning">象徵｜{plant.meaning}</div>
           </div>
         </div>
+        {planterName && <PlantShareButton key={`${plant.id}:${planterName}`} plant={plant} displayName={planterName}
+          capturePlant={() => viewerRef.current?.captureFrame()} />}
         <div className="story-body">{plant.desc}</div>
       </div>
     </div>
