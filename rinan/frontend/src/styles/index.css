@@ -806,7 +806,7 @@ textarea {
 @media (max-width: 700px) {
   .wall {
     height: 100dvh;
-    --wall-ticker-height: 36px;
+    --wall-ticker-height: 68px;
     --wall-controls-bottom: calc(var(--wall-ticker-height) + 64px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -950,12 +950,38 @@ textarea {
   .ticker {
     height: var(--wall-ticker-height);
     font-size: 0.68rem;
+    flex-direction: column;
+    align-items: stretch;
+    background: rgba(18, 15, 12, 0.88);
   }
 
   .ticker__latest {
-    max-width: 66vw;
-    padding-left: 0.75rem;
+    width: 100%;
+    max-width: none;
+    height: 36px;
+    flex: 0 0 36px;
+    padding: 0 0.75rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    pointer-events: auto;
+    background: rgba(18, 15, 12, 0.7);
   }
+
+  .ticker__latest::-webkit-scrollbar { display: none; }
+  .ticker__latest .ticker__badge, .ticker__latest .ticker__item { flex: 0 0 auto; }
+
+  .ticker__viewport {
+    display: flex;
+    align-items: center;
+    flex: 0 0 32px;
+    width: 100%;
+    min-height: 32px;
+    border-top: 1px solid rgba(246, 242, 232, 0.1);
+    mask-image: linear-gradient(to right, transparent, #000 1%, #000 99%, transparent);
+  }
+
+  .ticker__track .ticker__item { flex: 0 0 auto; }
 }
 
 /* Story modal (shared by Play + Wall) */

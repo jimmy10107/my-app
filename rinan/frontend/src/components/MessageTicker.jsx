@@ -15,7 +15,7 @@ function TickerEntry({ entry }) {
   );
 }
 
-// 投影牆底部的細長留言條：左邊固定顯示最新落地的一株，右邊是之前的留言跑馬燈。
+// 桌面左右並列；手機改成上排最新種植、下排全寬跑馬燈。
 // 跑馬燈只在每一圈跑完、位移歸零的那一刻才換內容，新留言進來不會讓整條跳一下。
 export function MessageTicker({ entries }) {
   const latest = entries[0];
@@ -29,16 +29,16 @@ export function MessageTicker({ entries }) {
   }, [rest, shown.length]);
 
   return (
-    <footer className="ticker">
+    <footer className="ticker" aria-label="種植動態">
       {latest ? (
-        <div className="ticker__latest" key={latest.id}>
-          <span className="ticker__badge">最新</span>
+        <div className="ticker__latest" key={latest.id} aria-label="最新種植，可左右滑動閱讀完整內容">
+          <span className="ticker__badge">最新種植</span>
           <TickerEntry entry={latest} />
         </div>
       ) : (
-        <div className="ticker__latest ticker__latest--empty">還沒有人種下，掃右下角的 QR 種下第一株</div>
+        <div className="ticker__latest ticker__latest--empty">還沒有人種下，一起種下第一株</div>
       )}
-      <div className="ticker__viewport">
+      <div className="ticker__viewport" aria-label="過往種植跑馬燈">
         {shown.length > 0 && (
           <div
             className="ticker__track"
