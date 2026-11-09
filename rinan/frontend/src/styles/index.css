@@ -454,7 +454,8 @@ textarea {
   position: absolute;
   left: 5vw;
   right: 5vw;
-  top: 14.5vh;
+  /* 投影版在標題與株數下方留白，避免漂浮文字遮到標頭。 */
+  top: max(11rem, 22vh);
   height: 23vh;
 }
 
