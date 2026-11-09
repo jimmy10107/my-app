@@ -1,4 +1,4 @@
-import { plantById } from './plants.js';
+import { plantById, PLANTS } from './plants.js';
 
 // 投影牆天空的文字雲：把訪客留言切成詞，同一個詞越多則留言提到，字就越大。
 // 中文沒有空白可以分詞，用瀏覽器內建的 Intl.Segmenter；但它對地名、在地用語常常
@@ -17,12 +17,34 @@ const BREAK_CHARS = new Set(
 const STOP_TERMS = new Set([
   '我們', '你們', '他們', '大家', '都是', '都有', '一起', '真的', '非常', '因為', '所以', '但是', '可以', '這裡',
   '那裡', '這個', '那個', '一個', '什麼', '還是', '就是', '已經', '自己', '覺得', '一下', '一定', '有點',
+  '我是', '這是', '那是', '也是', '不是', '這樣', '那樣', '你好', '您好', '希望', '喜歡', '認識',
+  '一切', '下次', '一日', '之間', '整片', '一片', '一株', '一棵', '一座', '種下', '長出', '長出來', '吹著',
   'the', 'and', 'you', 'for', 'are', 'this', 'that', 'with', 'is', 'to', 'of', 'in', 'it', 'so', 'a', 'an', 'i',
 ]);
 const DEGREE_PREFIX = /^[好很超太最真蠻挺]./u;
 
 const HAN = /\p{Script=Han}/u;
 const WORDLIKE = /[\p{L}\p{N}]/u;
+
+// 先辨認完整的地方與植物詞，再處理其餘文字，避免把「日南稻站」拆成「日南稻／站長出」。
+// 這些詞只在留言實際提到時擷取，不會額外產生留言沒有的內容。
+const LOCAL_TERMS = [
+  '日南稻站', '日南火車站', '日南車站', '日南人', '日南', '大甲芋頭', '大甲溪', '大安溪',
+  '九降風', '舊鐵橋', '人情味', '火車站', '八月雪', '黃金稻浪', '鐵道便當', '芋頭米粉',
+  '地方創生', '鐵道文化', '日常生活', '臺灣欒樹',
+];
+const escapePattern = (term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const PHRASES = new RegExp([...new Set([...LOCAL_TERMS, ...PLANTS.flatMap((plant) => [plant.name, plant.meaning])])]
+  .sort((a, b) => b.length - a.length).map(escapePattern).join('|'), 'gu');
+const FILLERS = new RegExp([...STOP_TERMS].filter((term) => HAN.test(term))
+  .sort((a, b) => b.length - a.length).map(escapePattern).join('|'), 'gu');
+const SINGLE_FILLERS = new RegExp([...BREAK_CHARS].join('|'), 'gu');
+
+function fallbackTokens(text) {
+  const cleaned = text.replace(FILLERS, ' ').replace(SINGLE_FILLERS, ' ');
+  return [...cleaned.matchAll(/[\p{L}\p{N}]+|[^\p{L}\p{N}]+/gu)]
+    .map(([segment]) => ({ segment, isWordLike: WORDLIKE.test(segment) }));
+}
 
 let segmenter;
 function getSegmenter() {
@@ -35,6 +57,7 @@ function getSegmenter() {
 function isStop(term) {
   const lower = term.toLowerCase();
   if (STOP_TERMS.has(lower)) return true;
+  if (!lower.replace(FILLERS, '').replace(SINGLE_FILLERS, '')) return true;
   return term.length === 2 && DEGREE_PREFIX.test(term);
 }
 
@@ -69,35 +92,50 @@ export function extractTerms(message) {
 
   const seg = getSegmenter();
   const terms = new Set();
-  if (seg) {
+  const readFragment = (fragment) => {
+    if (!fragment) return;
+    const before = terms.size;
     let group = [];
+    let sawContent = false;
     const flush = () => {
       mergeGroup(group).forEach((t) => {
         if (t.length >= 2 && t.length <= MAX_TERM_LENGTH && !isStop(t)) terms.add(t);
       });
       group = [];
     };
-    for (const { segment, isWordLike } of seg.segment(text)) {
+    const tokens = seg ? seg.segment(fragment) : fallbackTokens(fragment);
+    for (const { segment, isWordLike } of tokens) {
       if (!isWordLike || !WORDLIKE.test(segment)) {
         flush();
-      } else if (segment.length === 1 && BREAK_CHARS.has(segment)) {
+      } else if (isStop(segment) || (segment.length === 1 && BREAK_CHARS.has(segment))) {
         flush();
       } else if (!HAN.test(segment)) {
         // 英文、數字自成一詞，不跟中文黏在一起
         flush();
         if (segment.length >= 2 && segment.length <= MAX_TERM_LENGTH * 2 && !isStop(segment)) terms.add(segment);
       } else {
+        sawContent = true;
         group.push(segment);
       }
     }
     flush();
-  }
+    // 保留「田好香」這類有內容的短句；純虛詞及自我介紹片段不再從備援規則回流。
+    if (terms.size === before && sawContent) {
+      const compact = fragment.replace(/[\s\p{P}\p{S}]/gu, '');
+      if (compact.length >= 2 && compact.length <= MAX_TERM_LENGTH && !isStop(compact)
+        && !/^[我你他她它這那]/u.test(compact)
+        && compact.replace(FILLERS, '').replace(SINGLE_FILLERS, '').length >= 2) terms.add(compact);
+    }
+  };
+  const readRest = (fragment) => fragment.split(/[^\p{L}\p{N}]+/u).forEach(readFragment);
 
-  // 「田好香」這種短句切不出詞，就整句當一個詞，訪客寫的話不會憑空消失。
-  if (terms.size === 0) {
-    const compact = text.replace(/[\s\p{P}\p{S}]/gu, '');
-    if (compact.length >= 2 && compact.length <= MAX_TERM_LENGTH) terms.add(compact);
+  let start = 0;
+  for (const match of text.matchAll(PHRASES)) {
+    readRest(text.slice(start, match.index));
+    terms.add(match[0]);
+    start = match.index + match[0].length;
   }
+  readRest(text.slice(start));
   return [...terms];
 }
 

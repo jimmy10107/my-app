@@ -495,9 +495,9 @@ textarea {
   position: absolute;
   left: 5vw;
   right: 5vw;
-  /* 投影版在標題與株數下方留白，避免漂浮文字遮到標頭。 */
-  top: max(11rem, 22vh);
-  height: 23vh;
+  /* 天空帶由中央向兩側下降，WordCloud 另保留標題與搜尋按鈕的空間。 */
+  top: 8vh;
+  height: 32vh;
 }
 
 .word-cloud__word {
