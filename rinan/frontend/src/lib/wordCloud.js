@@ -30,7 +30,7 @@ const WORDLIKE = /[\p{L}\p{N}]/u;
 // 這些詞只在留言實際提到時擷取，不會額外產生留言沒有的內容。
 const LOCAL_TERMS = [
   '日南稻站', '日南火車站', '日南車站', '日南人', '日南', '大甲芋頭', '大甲溪', '大安溪',
-  '九降風', '舊鐵橋', '人情味', '火車站', '八月雪', '黃金稻浪', '鐵道便當', '芋頭米粉',
+  '強勁的東北季風', '東北季風', '九降風', '東北風', '舊鐵橋', '人情味', '火車站', '八月雪', '黃金稻浪', '鐵道便當', '芋頭米粉',
   '地方創生', '鐵道文化', '日常生活', '臺灣欒樹',
 ];
 const escapePattern = (term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -39,6 +39,13 @@ const PHRASES = new RegExp([...new Set([...LOCAL_TERMS, ...PLANTS.flatMap((plant
 const FILLERS = new RegExp([...STOP_TERMS].filter((term) => HAN.test(term))
   .sort((a, b) => b.length - a.length).map(escapePattern).join('|'), 'gu');
 const SINGLE_FILLERS = new RegExp([...BREAK_CHARS].join('|'), 'gu');
+
+// 舊留言中的地方稱呼統一換成展場上較容易理解的用語。
+const DISPLAY_TERMS = new Map([
+  ['九降風', '東北風'],
+  ['東北季風', '東北風'],
+  ['強勁的東北季風', '東北風'],
+]);
 
 function fallbackTokens(text) {
   const cleaned = text.replace(FILLERS, ' ').replace(SINGLE_FILLERS, ' ');
@@ -132,7 +139,7 @@ export function extractTerms(message) {
   let start = 0;
   for (const match of text.matchAll(PHRASES)) {
     readRest(text.slice(start, match.index));
-    terms.add(match[0]);
+    terms.add(DISPLAY_TERMS.get(match[0]) || match[0]);
     start = match.index + match[0].length;
   }
   readRest(text.slice(start));

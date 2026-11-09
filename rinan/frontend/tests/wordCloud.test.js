@@ -13,8 +13,9 @@ test('自我介紹、虛詞與數量片段不會透過短句備援回到文字�
 test('地名、植物名與完整概念不拆成「日南稻」「站長出」等片段', () => {
   assert.deepEqual(extractTerms('日南稻站長出整片花園'), ['日南稻站', '花園']);
   assert.deepEqual(extractTerms('日南車站旁的舊鐵橋'), ['日南車站', '舊鐵橋']);
-  assert.deepEqual(extractTerms('九降風吹著甜根子草'), ['九降風', '甜根子草']);
-  for (const term of ['九降風', '甜根子草', '台灣欒樹', '人情味', '大甲芋頭', '日常生活']) {
+  assert.deepEqual(extractTerms('九降風吹著甜根子草'), ['東北風', '甜根子草']);
+  assert.deepEqual(extractTerms('強勁的東北季風吹著甜根子草'), ['東北風', '甜根子草']);
+  for (const term of ['甜根子草', '台灣欒樹', '人情味', '大甲芋頭', '日常生活']) {
     assert.deepEqual(extractTerms(term), [term]);
   }
   assert.deepEqual(extractTerms('日南，田好香'), ['日南', '田好香']);
@@ -44,7 +45,7 @@ test('沒有內建中文分詞時，仍保留完整地方詞並排除虛詞', as
 });
 
 test('投影文字全部留在天空帶，避開標題與搜尋按鈕且彼此不重疊', () => {
-  const words = ['日南稻站', '日南車站', '家鄉', '人情味', '火車站', '生命力', '九降風', '舊鐵橋', '芋頭', '回家', '耕作', '守護']
+  const words = ['日南稻站', '日南車站', '家鄉', '人情味', '火車站', '生命力', '東北風', '舊鐵橋', '芋頭', '回家', '耕作', '守護']
     .map((term, i) => ({ term, weight: 4 - i * 0.2 }));
   for (const [width, height, titleWidth, titleHeight] of [[1700, 246, 600, 105], [920, 246, 450, 125]]) {
     const exclusions = [{ x0: 0, x1: titleWidth, y0: 0, y1: titleHeight }, { x0: width - 140, x1: width, y0: 0, y1: 50 }];
