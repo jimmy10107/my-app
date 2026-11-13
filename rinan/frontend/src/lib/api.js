@@ -46,6 +46,9 @@ export const api = {
 
   plantingStats: (token) => request('/api/plantings/stats', { token }),
 
+  socialReport: (token, { days = 28, refresh = false } = {}) =>
+    request(`/api/social/report?days=${days}${refresh ? '&refresh=1' : ''}`, { token }),
+
   createKioskSession: () => request('/api/kiosk/session', { method: 'POST' }),
 
   // CSV 下載不是 JSON，走獨立的 fetch + blob，觸發瀏覽器另存新檔。

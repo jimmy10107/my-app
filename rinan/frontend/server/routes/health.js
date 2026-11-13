@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { env, missingEnv } from '../env.js';
 import { db } from '../lib/db.js';
+import { missingMetaEnv } from '../lib/meta.js';
 
 export const healthRouter = Router();
 
@@ -17,7 +18,9 @@ healthRouter.get('/', async (_req, res) => {
     return res.status(503).json({ ok: false, missing, database: 'error', detail: error.message, ...(await probe()) });
   }
 
-  res.json({ ok: true, missing, database: 'ok', plantings: count ?? 0 });
+  // 社群洞察是選配，沒設定不影響 ok；只回報有沒有設定，不會實際呼叫 Meta。
+  const social = missingMetaEnv().length === 0 ? 'configured' : 'not_configured';
+  res.json({ ok: true, missing, database: 'ok', plantings: count ?? 0, social });
 });
 
 // 資料庫連不上時，再直接連一次 SUPABASE_URL，回報連的是哪個主機、卡在哪一步

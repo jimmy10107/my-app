@@ -6,6 +6,7 @@ import { plantingsRouter } from './routes/plantings.js';
 import { visitsRouter } from './routes/visits.js';
 import { lineUsersRouter } from './routes/lineUsers.js';
 import { kioskRouter } from './routes/kiosk.js';
+import { socialRouter } from './routes/social.js';
 
 // 跟網站部署在同一個 Vercel 專案（api/index.js 匯出這個 app），前端同網域呼叫 /api/*，
 // 不再需要另一台主機、CORS 或 FRONTEND_URL。本機開發則由 server/dev.js 啟動。
@@ -33,6 +34,7 @@ app.use('/api/plantings', plantingsRouter);
 app.use('/api/visits', visitsRouter);
 app.use('/api/line-users', lineUsersRouter);
 app.use('/api/kiosk', kioskRouter);
+app.use('/api/social', socialRouter);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: '找不到這個 API' });

@@ -28,6 +28,23 @@ export const env = {
   get visitDeviceSecret() {
     return read('VISIT_DEVICE_SECRET');
   },
+  // 社群洞察（選配）：沒設定時只有後台「社群洞察」分頁顯示設定說明，其它功能不受影響。
+  get metaPageId() {
+    return read('META_PAGE_ID');
+  },
+  get metaPageAccessToken() {
+    return read('META_PAGE_ACCESS_TOKEN');
+  },
+  // 留空時自動用粉專連結的 IG 專業帳號
+  get metaIgUserId() {
+    return read('META_IG_USER_ID');
+  },
+  get metaAppSecret() {
+    return read('META_APP_SECRET');
+  },
+  get metaGraphVersion() {
+    return read('META_GRAPH_VERSION') || 'v25.0';
+  },
 };
 
 export function missingEnv() {

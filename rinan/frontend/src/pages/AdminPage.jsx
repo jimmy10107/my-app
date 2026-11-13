@@ -3,8 +3,10 @@ import QRCode from 'qrcode';
 import { api } from '../lib/api.js';
 import { plantById } from '../lib/plants.js';
 import { JOIN_URL } from '../lib/joinUrl.js';
+import { SocialInsights } from '../components/SocialInsights.jsx';
 
 const TOKEN_KEY = 'rinan_admin_token';
+const TAB_KEY = 'rinan_admin_tab';
 const REFRESH_MS = 15000;
 
 function readToken() {
@@ -12,6 +14,14 @@ function readToken() {
     return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
+  }
+}
+
+function readTab() {
+  try {
+    return localStorage.getItem(TAB_KEY) === 'social' ? 'social' : 'wall';
+  } catch {
+    return 'wall';
   }
 }
 
@@ -145,6 +155,7 @@ function Stat({ value, label }) {
 }
 
 function Dashboard({ token, onLogout }) {
+  const [tab, setTab] = useState(readTab);
   const [recent, setRecent] = useState([]);
   const [visits, setVisits] = useState(null);
   const [lineStats, setLineStats] = useState(null);
@@ -216,8 +227,17 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
+  function pickTab(next) {
+    setTab(next);
+    try {
+      localStorage.setItem(TAB_KEY, next);
+    } catch {
+      // 存不了只是重新整理後回到預設分頁
+    }
+  }
+
   return (
-    <div className="page admin-page">
+    <div className={`page admin-page${tab === 'social' ? ' admin-page--wide' : ''}`}>
       <header className="admin-page__header">
         <h1>後台管理</h1>
         <button type="button" onClick={onLogout}>
@@ -225,72 +245,101 @@ function Dashboard({ token, onLogout }) {
         </button>
       </header>
 
-      <JoinLinkPanel />
-
-      <h2 className="admin-page__section-title">投影牆</h2>
-      <section className="admin-page__stats">
-        <Stat value={plantingStats?.onWall} label="牆上植株" />
-        <Stat value={plantingStats?.hidden} label="已下架" />
-        <Stat value={visits?.today} label="今日來訪" />
-      </section>
-
-      <h2 className="admin-page__section-title">整體參與（LINE ＋ 平板 Kiosk 合計）</h2>
-      <section className="admin-page__stats">
-        <Stat value={plantingStats?.totalInteractions} label="人次（種植總筆數）" />
-        <Stat value={plantingStats?.uniqueParticipants} label="人數（不重複參與者）" />
-        <Stat value={visits?.total} label="累積來訪" />
-      </section>
-
-      <h2 className="admin-page__section-title">LINE 使用者（去重留存）</h2>
-      <section className="admin-page__stats">
-        <Stat value={lineStats?.total} label="累積不重複人數" />
-        <Stat value={lineStats?.newToday} label="今日新朋友" />
-        <Stat value={lineStats?.returning} label="回訪人數" />
-      </section>
-
-      <div className="admin-page__export-row">
-        <button type="button" onClick={handleExport} disabled={exporting}>
-          {exporting ? '下載中…' : '下載原始名單 CSV'}
+      <nav className="admin-tabs" role="tablist" aria-label="後台分頁">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'wall'}
+          className={tab === 'wall' ? 'is-active' : ''}
+          onClick={() => pickTab('wall')}
+        >
+          現場互動
         </button>
-      </div>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'social'}
+          className={tab === 'social' ? 'is-active' : ''}
+          onClick={() => pickTab('social')}
+        >
+          社群洞察（FB／IG）
+        </button>
+      </nav>
 
-      {error && <p className="page__error">{error}</p>}
-
-      <h2 className="admin-page__section-title">最新種下（種下就直接上牆，看到不妥的按「下架」）</h2>
-      {loading ? (
-        <p>載入中…</p>
-      ) : recent.length === 0 ? (
-        <p>還沒有人種下。</p>
+      {tab === 'social' ? (
+        <SocialInsights token={token} onAuthError={handleError} />
       ) : (
-        <ul className="admin-page__list">
-          {recent.map((item) => {
-            const hidden = item.status !== 'approved';
-            return (
-              <li key={item.id} className={`admin-page__item${hidden ? ' is-hidden' : ''}`}>
-                <div>
-                  <strong>
-                    {plantById(item.plant_type)?.name}
-                    {item.display_name && `｜${item.display_name}`}
-                  </strong>
-                  <span className="admin-page__source-badge">{item.source === 'kiosk' ? '平板' : 'LINE'}</span>
-                  <span className={`admin-page__status${hidden ? ' is-hidden' : ''}`}>{hidden ? '已下架' : '牆上'}</span>
-                  <p>{item.message || '（沒有留言）'}</p>
-                  <time>{new Date(item.created_at).toLocaleString('zh-TW')}</time>
-                </div>
-                <div className="admin-page__actions">
-                  <button
-                    type="button"
-                    className={hidden ? '' : 'admin-page__hide'}
-                    disabled={busyId === item.id}
-                    onClick={() => toggle(item)}
-                  >
-                    {hidden ? '恢復' : '下架'}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <JoinLinkPanel />
+
+          <h2 className="admin-page__section-title">投影牆</h2>
+          <section className="admin-page__stats">
+            <Stat value={plantingStats?.onWall} label="牆上植株" />
+            <Stat value={plantingStats?.hidden} label="已下架" />
+            <Stat value={visits?.today} label="今日來訪" />
+          </section>
+
+          <h2 className="admin-page__section-title">整體參與（LINE ＋ 平板 Kiosk 合計）</h2>
+          <section className="admin-page__stats">
+            <Stat value={plantingStats?.totalInteractions} label="人次（種植總筆數）" />
+            <Stat value={plantingStats?.uniqueParticipants} label="人數（不重複參與者）" />
+            <Stat value={visits?.total} label="累積來訪" />
+          </section>
+
+          <h2 className="admin-page__section-title">LINE 使用者（去重留存）</h2>
+          <section className="admin-page__stats">
+            <Stat value={lineStats?.total} label="累積不重複人數" />
+            <Stat value={lineStats?.newToday} label="今日新朋友" />
+            <Stat value={lineStats?.returning} label="回訪人數" />
+          </section>
+
+          <div className="admin-page__export-row">
+            <button type="button" onClick={handleExport} disabled={exporting}>
+              {exporting ? '下載中…' : '下載原始名單 CSV'}
+            </button>
+          </div>
+
+          {error && <p className="page__error">{error}</p>}
+
+          <h2 className="admin-page__section-title">最新種下（種下就直接上牆，看到不妥的按「下架」）</h2>
+          {loading ? (
+            <p>載入中…</p>
+          ) : recent.length === 0 ? (
+            <p>還沒有人種下。</p>
+          ) : (
+            <ul className="admin-page__list">
+              {recent.map((item) => {
+                const hidden = item.status !== 'approved';
+                return (
+                  <li key={item.id} className={`admin-page__item${hidden ? ' is-hidden' : ''}`}>
+                    <div>
+                      <strong>
+                        {plantById(item.plant_type)?.name}
+                        {item.display_name && `｜${item.display_name}`}
+                      </strong>
+                      <span className="admin-page__source-badge">{item.source === 'kiosk' ? '平板' : 'LINE'}</span>
+                      <span className={`admin-page__status${hidden ? ' is-hidden' : ''}`}>
+                        {hidden ? '已下架' : '牆上'}
+                      </span>
+                      <p>{item.message || '（沒有留言）'}</p>
+                      <time>{new Date(item.created_at).toLocaleString('zh-TW')}</time>
+                    </div>
+                    <div className="admin-page__actions">
+                      <button
+                        type="button"
+                        className={hidden ? '' : 'admin-page__hide'}
+                        disabled={busyId === item.id}
+                        onClick={() => toggle(item)}
+                      >
+                        {hidden ? '恢復' : '下架'}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );
