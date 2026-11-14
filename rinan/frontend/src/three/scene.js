@@ -9,11 +9,10 @@ import { PLANT_SPRITES } from '../lib/plantSprites.js';
 import { Backdrop } from './backdrop.js';
 import { ArrivalOverlay, GO_MS } from './arrivalOverlay.js';
 
-const GARDEN_RADIUS = 2.4; // 植株分布範圍
-const GROUND_RADIUS = 5.2; // 地面比花園大，邊緣淡出融進遠景，不會看到一顆硬邊的圓頂
+const GARDEN_RADIUS = 3.35; // 放大植株根點的分布範圍，讓累積的參與痕跡更疏朗
+const GROUND_RADIUS = 6.8; // 地面比花園大，邊緣淡出融進遠景，不會看到一顆硬邊的圓頂
 const FIREFLY_COUNT = 72;
 const SHADOW_LAYER = 1; // 影子只畫進影子貼圖，不直接出現在主畫面
-const SEEDLING_FRACTION = 0.12; // growth.js 第一階段的長度：新到的植株直接從完整的幼苗開始
 const POP_MS = 1500; // 落地「冒出來」的彈跳時間
 const RING_MS = 2600;
 const MAX_FLYING = 8; // 同時最多幾株走飛入動畫；斷線很久一次補進很多筆時，其餘直接冒出來
@@ -22,27 +21,26 @@ const LAUNCH_GAP_MS = 900; // 同一批進來的植株錯開起飛
 // 作物以群落呈現，讓稻株與河床甜根子草在整片植生裡保有清楚輪廓。
 const SPECIES_PRESENTATION = {
   rice: {
-    scale: 1.55,
-    innerRadius: 0.95,
+    scale: 1.28,
+    innerRadius: 1.05,
     outerRadius: GARDEN_RADIUS,
     brightness: 1.1,
     clump: [
-      { x: -0.22, z: 0.12, scale: 0.78 },
-      { x: 0.2, z: 0.1, scale: 0.82 },
-      { x: -0.08, z: -0.2, scale: 0.72 },
+      { x: -0.36, z: 0.14, scale: 0.52 },
+      { x: 0.36, z: -0.14, scale: 0.52 },
     ],
   },
   miscanthus: {
-    scale: 1.38,
-    innerRadius: 1.25,
+    scale: 1.18,
+    innerRadius: 1.35,
     outerRadius: GARDEN_RADIUS,
     brightness: 1.08,
     clump: [
-      { x: -0.26, z: 0.08, scale: 0.82 },
-      { x: 0.24, z: -0.06, scale: 0.76 },
+      { x: -0.36, z: 0.12, scale: 0.52 },
+      { x: 0.36, z: -0.12, scale: 0.52 },
     ],
   },
-  taro: { scale: 1.08, innerRadius: 0.7, outerRadius: 2.25, brightness: 1.02 },
+  taro: { scale: 1, innerRadius: 0.7, outerRadius: GARDEN_RADIUS * 0.95, brightness: 1.02 },
 };
 
 const ORANGE = '#D99531';
@@ -567,7 +565,7 @@ export class GardenScene {
   _positionFor(id, presentation = {}) {
     const a = hashToUnit(id, 1) * Math.PI * 2;
     const inner = presentation.innerRadius ?? 0.35;
-    const outer = presentation.outerRadius ?? 2.15;
+    const outer = presentation.outerRadius ?? GARDEN_RADIUS;
     const r = Math.sqrt(inner * inner + hashToUnit(id, 2) * (outer * outer - inner * inner));
     return { x: Math.cos(a) * r, z: Math.sin(a) * r };
   }
@@ -628,7 +626,7 @@ export class GardenScene {
       this.overlay.cancel(id);
       entry.launched = true;
       entry.appearAt = now - POP_MS;
-      entry.createdAtMs = now - SEEDLING_FRACTION * entry.cycleSeconds * 1000;
+      entry.createdAtMs = now;
       entry.landed = true;
       this.onLanded?.(entry.row);
     }
@@ -655,7 +653,7 @@ export class GardenScene {
 
     const stages = spriteDefs.map((def) => {
       const record = this._texture(def.file);
-      const k = (gardenHeight(def.size[1]) / def.size[1]) * (presentation.scale ?? 1);
+      const k = (gardenHeight(def.size[1]) / def.size[1]) * 0.92 * (presentation.scale ?? 1);
       const width = def.size[0] * k;
       const height = def.size[1] * k;
 
@@ -726,13 +724,13 @@ export class GardenScene {
       stages,
       blob,
       phase: hashToUnit(row.id, 3) * Math.PI * 2,
-      variationScale: lerp(0.8, 1.24, hashToUnit(row.id, 5)),
-      cycleSeconds: plant.cycleSeconds * lerp(0.84, 1.16, hashToUnit(row.id, 6)),
-      // 剛種下的：從落地那一刻起算，而且直接是完整的幼苗（不用等十幾秒慢慢淡入）；
+      variationScale: lerp(0.9, 1.1, hashToUnit(row.id, 5)),
+      cycleSeconds: plant.cycleSeconds,
+      // 新種下的植株從落地那一刻開始完整的 18 分鐘生命週期，第一階段以清楚可見的幼苗呈現。
       // 時間用這台電腦自己的時鐘，不受牆面電腦跟資料庫時間差影響。
-      // 開機時替每株錯開固定的週期起點，同一時間種下的一批也不會一起長、一起凋零。
+      // 既有植株用固定雜湊錯開週期起點，讓畫面同時看見不同生長階段。
       createdAtMs: fresh
-        ? appearAt - SEEDLING_FRACTION * cycleMs
+        ? appearAt
         : new Date(row.created_at).getTime() - hashToUnit(row.id, 7) * cycleMs,
       launchAt: mode === 'fly' ? launchAt : null,
       appearAt,
@@ -822,12 +820,12 @@ export class GardenScene {
       const g = growthState(entry.cycleSeconds, entry.createdAtMs, nowMs);
       const focused = this.focusedId === entry.row.id;
       if (focused) {
-        g.opacity = Math.max(0.75, g.opacity);
-        g.scale = Math.max(0.65, g.scale);
+        g.opacity = Math.max(0.55, g.opacity);
+        g.scale = Math.max(0.35, g.scale);
       }
       // 各階段圖本身就一階比一階大，root 只做輕微的縮放，避免幼苗小到看不見。
       const pop = sinceAppear < POP_MS ? Math.max(0, easeOutBack(sinceAppear / POP_MS)) : 1;
-      const scale = (0.4 + 0.6 * g.scale) * entry.variationScale * pop;
+      const scale = (0.24 + 0.76 * g.scale) * entry.variationScale * pop;
       entry.root.scale.setScalar(Math.max(scale, 0.0001));
       const sway = Math.sin(elapsed * 0.7 + entry.phase) * 0.025 + Math.sin(elapsed * 1.9 + entry.phase) * 0.008;
 

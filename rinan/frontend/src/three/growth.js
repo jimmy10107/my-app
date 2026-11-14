@@ -1,6 +1,6 @@
-// 生長週期：幼苗(0) → 生長(1) → 盛開(2) → 凋萎(3) → 回到幼苗，循環不停。
-// 讓投影牆即使沒有新的互動，也一直是「活的」，不會停在同一個畫面。
-const STAGE_FRACTIONS = [0.12, 0.4, 0.62, 0.88];
+// 18 分鐘一輪：幼苗 → 生長 → 峰值 → 凋零 → 淡出再生。
+// 前五個節點每三分鐘推進一次，讓新種下與既有植株能在牆上形成清楚的生命階段差異。
+const STAGE_FRACTIONS = [1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6];
 
 function smoothstep(a, b, x) {
   if (a === b) return x < a ? 0 : 1;
@@ -10,56 +10,60 @@ function smoothstep(a, b, x) {
 
 /**
  * 計算某一筆種下紀錄在目前時間的生長狀態。
- * @param {number} cycleSeconds 該植物完整生長一輪需要的秒數
+ * @param {number} cycleSeconds 該植物完整生長一輪需要的秒數（本展設定為 18 分鐘）
  * @param {number} createdAtMs 種下時間（epoch ms）
  * @param {number} nowMs 目前時間（epoch ms）
  */
 export function growthState(cycleSeconds, createdAtMs, nowMs) {
   const cycleMs = cycleSeconds * 1000;
-  // 牆面電腦的時鐘可能比資料庫慢幾秒，剛種下的那筆會算出負的經過時間；
-  // 不能讓它繞回週期尾端（剛種就變成凋萎），一律從發芽開始算。
+  // 牆面電腦的時鐘可能比資料庫慢幾秒；負時間一律從幼苗開始，不繞回週期尾端。
   const progress = (Math.max(0, nowMs - createdAtMs) % cycleMs) / cycleMs;
-
-  const [s1, s2, s3, s4] = STAGE_FRACTIONS;
+  const [seedlingEnd, earlyGrowthEnd, fullGrowthEnd, peakEnd, wiltEnd] = STAGE_FRACTIONS;
   let scale;
   let opacity;
   let formA;
   let formB;
   let formT;
 
-  if (progress < s1) {
-    const t = smoothstep(0, s1, progress);
-    scale = 0.08 + t * 0.5;
-    opacity = t;
+  if (progress < seedlingEnd) {
+    const t = smoothstep(0, seedlingEnd, progress);
+    scale = 0.12 + t * 0.38;
+    opacity = 0.78 + t * 0.22;
     formA = 0;
     formB = 0;
     formT = 0;
-  } else if (progress < s2) {
-    const t = smoothstep(s1, s2, progress);
-    scale = 0.55 + t * 0.45;
+  } else if (progress < earlyGrowthEnd) {
+    const t = smoothstep(seedlingEnd, earlyGrowthEnd, progress);
+    scale = 0.5 + t * 0.25;
     opacity = 1;
     formA = 0;
     formB = 1;
     formT = t;
-  } else if (progress < s3) {
-    const local = (progress - s2) / (s3 - s2);
-    const wave = Math.sin(local * Math.PI);
-    scale = 1 + wave * 0.08;
+  } else if (progress < fullGrowthEnd) {
+    const t = smoothstep(earlyGrowthEnd, fullGrowthEnd, progress);
+    scale = 0.75 + t * 0.24;
+    opacity = 1;
+    formA = 1;
+    formB = 1;
+    formT = 0;
+  } else if (progress < peakEnd) {
+    const t = smoothstep(fullGrowthEnd, peakEnd, progress);
+    scale = 0.99 + t * 0.09;
     opacity = 1;
     formA = 1;
     formB = 2;
-    formT = smoothstep(0, 1, local);
-  } else if (progress < s4) {
-    const t = smoothstep(s3, s4, progress);
-    scale = 1 - t * 0.35;
-    opacity = 1 - t * 0.55;
+    formT = t;
+  } else if (progress < wiltEnd) {
+    const t = smoothstep(peakEnd, wiltEnd, progress);
+    scale = 1.08 - t * 0.28;
+    opacity = 1 - t * 0.12;
     formA = 2;
     formB = 3;
     formT = t;
   } else {
-    const t = smoothstep(s4, 1, progress);
-    scale = 0.3 * (1 - t) + 0.04;
-    opacity = 0.35 * (1 - t);
+    const t = smoothstep(wiltEnd, 1, progress);
+    scale = 0.8 * (1 - t) + 0.04;
+    opacity = 0.88 * (1 - t);
     formA = 3;
     formB = 3;
     formT = 0;
