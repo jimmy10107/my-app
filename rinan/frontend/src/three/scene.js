@@ -902,9 +902,9 @@ export class GardenScene {
     const rig = this._rig;
     if (!rig) return;
     const focused = this.entries.get(this.focusedId);
-    const delta = Math.min(0.05, Math.max(0, elapsed - (this._cameraElapsed ?? elapsed)));
+    const dragDelta = Math.min(0.05, Math.max(0, elapsed - (this._cameraElapsed ?? elapsed)));
     this._cameraElapsed = elapsed;
-    if (!this._dragPointer) { this._userAngle += this._dragVelocity * delta; this._dragVelocity *= Math.exp(-delta * 4.2); if (Math.abs(this._dragVelocity) < 0.002) this._dragVelocity = 0; }
+    if (!this._dragPointer) { this._userAngle += this._dragVelocity * dragDelta; this._dragVelocity *= Math.exp(-dragDelta * 4.2); if (Math.abs(this._dragVelocity) < 0.002) this._dragVelocity = 0; }
     const angle = focused ? this._focusAngle : this.baseAngle + elapsed * 0.02 + this._userAngle;
     const elevation = rig.elevation + Math.sin(elapsed * 0.11) * 0.012;
     const distance = focused ? THREE.MathUtils.clamp(rig.distance * 0.55, 3.2, 7) : rig.distance;
