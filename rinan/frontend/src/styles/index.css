@@ -1692,12 +1692,8 @@ textarea {
 }
 
 
-/* 手機互動：畫布用 Pointer Events 接手水平旋轉，泡泡有獨立抓取區與浮起回饋 */
+/* 手機互動：以 Pointer Events 支援花園水平旋轉與慣性滑動 */
 .wall__canvas { touch-action: none; }
-.word-cloud { pointer-events: none; }
-.word-cloud__word { pointer-events: auto; touch-action: none; cursor: grab; will-change: transform; }
-.word-cloud__word.is-dragging { z-index: 5; cursor: grabbing; transition: none !important; }
-.word-cloud__word.is-dragging .word-cloud__float { animation-play-state: paused; }
 .wall__gesture-hint {
   position: absolute; left: 50%; top: 43%;
   transform: translateX(-50%);
@@ -1717,17 +1713,5 @@ textarea {
 .wall__gesture-hint span { margin-right: 0.28rem; color: #f0c27a; font-size: 1rem; }
 @keyframes gesture-hint-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (min-width: 701px) { .wall__gesture-hint { display: none; } }
-@media (max-width: 700px) {
-  .word-cloud__word {
-    padding: 0.45em 0.66em;
-    border: 1px solid rgba(232, 241, 246, 0.3);
-    border-radius: 999px;
-    background: rgba(21, 43, 59, 0.42);
-    box-shadow: 0 5px 14px rgba(4, 16, 27, 0.24), inset 0 1px rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
-  .word-cloud__word--fresh { border-color: rgba(255, 197, 110, 0.75); }
-  .wall__gesture-hint { top: 43%; font-size: 0.66rem; }
-}
+@media (max-width: 700px) { .wall__gesture-hint { top: 43%; font-size: 0.66rem; } }
 @media (prefers-reduced-motion: reduce) { .wall__gesture-hint { animation: none; } }
