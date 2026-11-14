@@ -330,6 +330,10 @@ export class GardenScene {
     this._userElevation = 0;
     this._verticalVelocity = 0;
     this._dragPointer = null;
+    this._pointers = new Map();
+    this._pinchMode = false;
+    this._pinchDistance = 0;
+    this._zoomScale = 1;
     this._reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     this._dragMoved = false;
     this._suppressClick = false;
@@ -485,40 +489,71 @@ export class GardenScene {
       if (id && this.onSelect) this.onSelect(id);
     };
     this._handleDown = (event) => {
-      if (event.button !== 0 || event.isPrimary === false || this.focusedId || this._dragPointer) return;
-      this._suppressClick = false;
-      this._dragPointer = {
-        id: event.pointerId, x: event.clientX, y: event.clientY,
-        lastX: event.clientX, lastY: event.clientY, time: performance.now(),
-      };
-      this._dragMoved = false;
+      if (event.button !== 0 || this._pointers.size >= 2) return;
+      const now = performance.now();
+      this._pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      this.canvas.setPointerCapture?.(event.pointerId);
       this._dragVelocity = 0;
       this._verticalVelocity = 0;
       this.onHover?.(null, null);
-      this.canvas.setPointerCapture?.(event.pointerId);
+      if (this._pointers.size === 2) {
+        const [a, b] = [...this._pointers.values()];
+        this._pinchMode = true;
+        this._pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+        this._dragPointer = null;
+        this._suppressClick = true;
+        return;
+      }
+      this._suppressClick = false;
+      this._dragMoved = false;
+      this._dragPointer = {
+        id: event.pointerId, x: event.clientX, y: event.clientY,
+        lastX: event.clientX, lastY: event.clientY, time: now,
+      };
     };
     this._handleUp = (event) => {
+      if (!this._pointers.has(event.pointerId)) return;
+      this._pointers.delete(event.pointerId);
       const drag = this._dragPointer;
-      if (!drag || event.pointerId !== drag.id) return;
-      this._suppressClick = this._dragMoved;
-      if (event.type !== 'pointerup' || performance.now() - drag.time > 90 || this._reducedMotion.matches) {
-        this._dragVelocity = 0;
-        this._verticalVelocity = 0;
+      if (drag?.id === event.pointerId) {
+        this._suppressClick = this._dragMoved || event.type !== 'pointerup';
+        if (event.type !== 'pointerup' || performance.now() - drag.time > 90 || this._reducedMotion.matches) {
+          this._dragVelocity = 0;
+          this._verticalVelocity = 0;
+        }
+        this._dragPointer = null;
       }
-      this._dragPointer = null;
+      // 捏合後剩下一指時，等整次手勢結束，避免鏡頭突然轉向或誤開故事。
+      if (this._pinchMode) {
+        this._suppressClick = true;
+        if (this._pointers.size === 0) this._pinchMode = false;
+      }
       if (this.canvas.hasPointerCapture?.(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
       this.canvas.style.cursor = '';
     };
     this._handleMove = (event) => {
-      const drag = this._dragPointer;
-      if (drag?.id === event.pointerId) {
+      if (this._pointers.has(event.pointerId)) {
+        this._pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (this._pinchMode) {
+          if (this._pointers.size === 2) {
+            const [a, b] = [...this._pointers.values()];
+            const distance = Math.hypot(a.x - b.x, a.y - b.y);
+            if (distance > 8 && this._pinchDistance > 8) {
+              this._zoomScale = THREE.MathUtils.clamp(
+                this._zoomScale * this._pinchDistance / distance, 0.45, 1.65);
+            }
+            this._pinchDistance = distance;
+          }
+          return;
+        }
+        const drag = this._dragPointer;
+        if (!drag || drag.id !== event.pointerId) return;
         const now = performance.now();
         const dx = event.clientX - drag.lastX;
         const dy = event.clientY - drag.lastY;
         const dt = Math.max(8, now - drag.time) / 1000;
         if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 6) this._dragMoved = true;
-        if (this._dragMoved) {
-          // 水平環繞；垂直俯仰按畫布高度換算，直向手機也能跟手移動。
+        if (this._dragMoved && !this.focusedId) {
           const pitchStep = dy / Math.max(320, this.height) * 1.25;
           this._userAngle -= dx * 0.008;
           const nextPitch = this._userElevation + pitchStep;
@@ -526,24 +561,36 @@ export class GardenScene {
           this._dragVelocity = THREE.MathUtils.clamp(-dx * 0.008 / dt, -4, 4);
           this._verticalVelocity = nextPitch === this._userElevation
             ? THREE.MathUtils.clamp(pitchStep / dt, -1.2, 1.2) : 0;
-          this.canvas.style.cursor = 'grabbing';
         }
         drag.lastX = event.clientX;
         drag.lastY = event.clientY;
         drag.time = now;
         return;
       }
-      // 手機手指不模擬 hover，避免滑動時反覆射線拾取與更新提示卡。
-      if (event.pointerType !== 'mouse' || this._dragPointer) return;
+      if (event.pointerType !== 'mouse' || this._pointers.size) return;
       const id = this._pick(event);
       this.canvas.style.cursor = id ? 'pointer' : '';
       const rect = this.canvas.getBoundingClientRect();
       this.onHover?.(id, id ? { x: event.clientX - rect.left, y: event.clientY - rect.top } : null);
     };
+    // 僅在 3D 畫布攔截瀏覽器捏合／回彈，浮層中的故事文字仍可正常捲動。
+    this._preventNativeGesture = (event) => {
+      if (event.cancelable) event.preventDefault();
+    };
+    this._handleWheel = (event) => {
+      if (event.cancelable) event.preventDefault();
+      const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.height : 1);
+      this._zoomScale = THREE.MathUtils.clamp(this._zoomScale * Math.exp(
+        THREE.MathUtils.clamp(pixels * 0.0015, -0.3, 0.3)), 0.45, 1.65);
+    };
     this._handleLeave = () => {
       this.canvas.style.cursor = '';
       this.onHover?.(null, null);
     };
+    this.canvas.addEventListener('touchmove', this._preventNativeGesture, { passive: false });
+    this.canvas.addEventListener('gesturestart', this._preventNativeGesture, { passive: false });
+    this.canvas.addEventListener('gesturechange', this._preventNativeGesture, { passive: false });
+    this.canvas.addEventListener('wheel', this._handleWheel, { passive: false });
     this.canvas.addEventListener('pointerdown', this._handleDown);
     this.canvas.addEventListener('pointerup', this._handleUp);
     this.canvas.addEventListener('pointercancel', this._handleUp);
@@ -551,6 +598,15 @@ export class GardenScene {
     this.canvas.addEventListener('click', this._handleClick);
     this.canvas.addEventListener('pointermove', this._handleMove);
     this.canvas.addEventListener('pointerleave', this._handleLeave);
+  }
+
+  resetView() {
+    this._userAngle = 0;
+    this._userElevation = 0;
+    this._dragVelocity = 0;
+    this._verticalVelocity = 0;
+    this._zoomScale = 1;
+    this._pinchDistance = 0;
   }
 
   // 飛入動畫的起點（QR 卡片），座標是相對於畫布左上角的 CSS 像素
@@ -955,7 +1011,8 @@ export class GardenScene {
     const angle = focused ? this._focusAngle : this.baseAngle + elapsed * 0.02 + this._userAngle;
     const elevation = THREE.MathUtils.clamp(rig.elevation + (focused ? 0 : this._userElevation)
       + Math.sin(elapsed * 0.11) * 0.012, 0.15, 1.15);
-    const distance = focused ? THREE.MathUtils.clamp(rig.distance * 0.55, 3.2, 7) : rig.distance;
+    const baseDistance = focused ? THREE.MathUtils.clamp(rig.distance * 0.55, 3.2, 7) : rig.distance;
+    const distance = Math.max(1.8, baseDistance * this._zoomScale);
     this._lookDesired.set(focused?.root.position.x ?? 0,
       focused ? Math.max(0.25, focused.height * 0.5) : rig.targetY,
       focused?.root.position.z ?? 0);
@@ -963,7 +1020,7 @@ export class GardenScene {
     this._cameraDesired.set(Math.cos(angle) * flat, Math.sin(elevation) * distance, Math.sin(angle) * flat)
       .add(this._lookDesired);
     const delta = Math.min(0.1, Math.max(0, elapsed - (this._lastElapsed ?? elapsed - 1 / 60)));
-    const damping = 1 - Math.exp(-delta * (this._dragPointer ? 20 : 8));
+    const damping = 1 - Math.exp(-delta * (this._pointers.size ? 20 : 8));
     this.camera.position.lerp(this._cameraDesired, damping);
     this._lookTarget.lerp(this._lookDesired, damping);
     this.camera.lookAt(this._lookTarget);
@@ -1024,6 +1081,11 @@ export class GardenScene {
   dispose() {
     this._destroyed = true;
     if (this._raf) cancelAnimationFrame(this._raf);
+    this.canvas.removeEventListener('touchmove', this._preventNativeGesture);
+    this.canvas.removeEventListener('gesturestart', this._preventNativeGesture);
+    this.canvas.removeEventListener('gesturechange', this._preventNativeGesture);
+    this.canvas.removeEventListener('wheel', this._handleWheel);
+    this._pointers.clear();
     this.canvas.removeEventListener('pointerdown', this._handleDown);
     this.canvas.removeEventListener('pointerup', this._handleUp);
     this.canvas.removeEventListener('pointercancel', this._handleUp);

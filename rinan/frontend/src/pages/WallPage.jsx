@@ -360,7 +360,11 @@ export function WallPage() {
         </header>
 
         <WordCloud words={cloudWords} />
-        <div className="wall__gesture-hint" aria-hidden="true"><span>↕ ↔</span> 拖曳探索花園</div>
+        <div className="wall__gesture-hint">
+          <span aria-hidden="true">↔</span> 單指滑動・雙指縮放
+          <button type="button" className="wall__view-reset" onClick={() => sceneRef.current?.resetView()}
+            aria-label="恢復花園預設視角與大小">重設</button>
+        </div>
         <PlantSearch rows={rows ?? []} selectedEntry={locatedEntry} locating={locating}
           locationError={locationError} onLocate={locatePlant} onClear={clearLocation} onReadStory={setStoryEntry} />
         {locatedEntry && <div className="wall__located-marker" ref={locationMarkerRef}>

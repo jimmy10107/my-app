@@ -1693,7 +1693,7 @@ textarea {
 
 
 /* 手機互動：以 Pointer Events 支援花園水平旋轉與慣性滑動 */
-.wall__canvas { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.wall__canvas { overscroll-behavior: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .wall__gesture-hint {
   position: absolute; left: 50%; top: 43%;
   transform: translateX(-50%);
@@ -1715,3 +1715,23 @@ textarea {
 @media (min-width: 701px) { .wall__gesture-hint { display: none; } }
 @media (max-width: 700px) { .wall__gesture-hint { top: 43%; font-size: 0.66rem; } }
 @media (prefers-reduced-motion: reduce) { .wall__gesture-hint { animation: none; } }
+
+/* 花園手勢提示與可隨時恢復的預設視角 */
+.wall__gesture-hint { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; max-width: calc(100vw - 2rem); }
+.wall__view-reset {
+  pointer-events: auto;
+  touch-action: manipulation;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -0.4rem -0.6rem -0.4rem 0.15rem;
+  padding: 0 0.55rem;
+  border: 0;
+  border-left: 1px solid rgba(235, 242, 242, 0.25);
+  border-radius: 0 999px 999px 0;
+  color: #f0c27a;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.wall__view-reset:focus-visible { outline: 2px solid #f0c27a; outline-offset: 2px; }
+@media (min-width: 701px) { .wall__gesture-hint { display: none; } }
