@@ -360,6 +360,7 @@ export function WallPage() {
         </header>
 
         <WordCloud words={cloudWords} />
+        <div className="wall__gesture-hint" aria-hidden="true"><span>↔</span> 拖曳花園旋轉・泡泡可移動</div>
         <PlantSearch rows={rows ?? []} selectedEntry={locatedEntry} locating={locating}
           locationError={locationError} onLocate={locatePlant} onClear={clearLocation} onReadStory={setStoryEntry} />
         {locatedEntry && <div className="wall__located-marker" ref={locationMarkerRef}>

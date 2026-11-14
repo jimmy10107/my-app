@@ -12,6 +12,8 @@ export function WordCloud({ words }) {
   const previousRef = useRef({ key: '', positions: new Map() });
   const [box, setBox] = useState({ width: 0, height: 0, exclusions: [], skyBand: false });
   const [epoch, setEpoch] = useState(0);
+  const [dragOffsets, setDragOffsets] = useState({});
+  const dragRef = useRef(null);
 
   useEffect(() => {
     const timer = setInterval(() => setEpoch((e) => e + 1), RELAYOUT_MS);
@@ -54,6 +56,27 @@ export function WordCloud({ words }) {
     return result;
   }, [words, box, epoch]);
 
+  const startDrag = (event, term) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = { term, id: event.pointerId, x: event.clientX, y: event.clientY,
+      offset: dragOffsets[term] || { x: 0, y: 0 } };
+    event.currentTarget.classList.add('is-dragging');
+  };
+  const moveDrag = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    setDragOffsets((current) => ({ ...current, [drag.term]: {
+      x: drag.offset.x + event.clientX - drag.x, y: drag.offset.y + event.clientY - drag.y,
+    } }));
+  };
+  const stopDrag = (event) => {
+    if (dragRef.current?.id !== event.pointerId) return;
+    event.currentTarget.classList.remove('is-dragging');
+    dragRef.current = null;
+  };
+
   return (
     <div className="word-cloud" ref={ref} aria-label="訪客留言文字雲">
       {placed.map((word) => {
@@ -65,8 +88,15 @@ export function WordCloud({ words }) {
           <span
             key={word.term}
             className={cls}
+            role="button"
+            tabIndex={0}
+            aria-label={`拖曳留言泡泡：${word.term}`}
+            onPointerDown={(event) => startDrag(event, word.term)}
+            onPointerMove={moveDrag}
+            onPointerUp={stopDrag}
+            onPointerCancel={stopDrag}
             style={{
-              transform: `translate3d(${word.x.toFixed(1)}px, ${word.y.toFixed(1)}px, 0) translate(-50%, -50%)`,
+              transform: `translate3d(${(word.x + (dragOffsets[word.term]?.x || 0)).toFixed(1)}px, ${(word.y + (dragOffsets[word.term]?.y || 0)).toFixed(1)}px, 0) translate(-50%, -50%)`,
               fontSize: `${word.size.toFixed(1)}px`,
               opacity: word.fresh
                 ? 1
