@@ -327,7 +327,10 @@ export class GardenScene {
     this.baseAngle = Math.random() * Math.PI * 2;
     this._userAngle = 0;
     this._dragVelocity = 0;
+    this._userElevation = 0;
+    this._verticalVelocity = 0;
     this._dragPointer = null;
+    this._reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     this._dragMoved = false;
     this._suppressClick = false;
     this.textures = new Map();
@@ -482,22 +485,56 @@ export class GardenScene {
       if (id && this.onSelect) this.onSelect(id);
     };
     this._handleDown = (event) => {
-      if (event.button !== 0 || this.focusedId) return;
-      this._dragPointer = { id: event.pointerId, x: event.clientX, lastX: event.clientX, time: performance.now() };
-      this._dragMoved = false; this._dragVelocity = 0;
+      if (event.button !== 0 || event.isPrimary === false || this.focusedId || this._dragPointer) return;
+      this._suppressClick = false;
+      this._dragPointer = {
+        id: event.pointerId, x: event.clientX, y: event.clientY,
+        lastX: event.clientX, lastY: event.clientY, time: performance.now(),
+      };
+      this._dragMoved = false;
+      this._dragVelocity = 0;
+      this._verticalVelocity = 0;
+      this.onHover?.(null, null);
       this.canvas.setPointerCapture?.(event.pointerId);
     };
     this._handleUp = (event) => {
-      if (!this._dragPointer || event.pointerId !== this._dragPointer.id) return;
-      this._suppressClick = this._dragMoved; this._dragPointer = null;
+      const drag = this._dragPointer;
+      if (!drag || event.pointerId !== drag.id) return;
+      this._suppressClick = this._dragMoved;
+      if (event.type !== 'pointerup' || performance.now() - drag.time > 90 || this._reducedMotion.matches) {
+        this._dragVelocity = 0;
+        this._verticalVelocity = 0;
+      }
+      this._dragPointer = null;
+      if (this.canvas.hasPointerCapture?.(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+      this.canvas.style.cursor = '';
     };
     this._handleMove = (event) => {
-      if (this._dragPointer?.id === event.pointerId) {
-        const now = performance.now(), dx = event.clientX - this._dragPointer.lastX;
-        if (Math.abs(event.clientX - this._dragPointer.x) > 5) this._dragMoved = true;
-        if (this._dragMoved) { this._userAngle -= dx * 0.008; this._dragVelocity = -dx * 0.008 / Math.max(8, now - this._dragPointer.time) * 1000; }
-        this._dragPointer.lastX = event.clientX; this._dragPointer.time = now;
+      const drag = this._dragPointer;
+      if (drag?.id === event.pointerId) {
+        const now = performance.now();
+        const dx = event.clientX - drag.lastX;
+        const dy = event.clientY - drag.lastY;
+        const dt = Math.max(8, now - drag.time) / 1000;
+        if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 6) this._dragMoved = true;
+        if (this._dragMoved) {
+          // 水平環繞；垂直俯仰按畫布高度換算，直向手機也能跟手移動。
+          const pitchStep = dy / Math.max(320, this.height) * 1.25;
+          this._userAngle -= dx * 0.008;
+          const nextPitch = this._userElevation + pitchStep;
+          this._userElevation = THREE.MathUtils.clamp(nextPitch, -0.22, 0.44);
+          this._dragVelocity = THREE.MathUtils.clamp(-dx * 0.008 / dt, -4, 4);
+          this._verticalVelocity = nextPitch === this._userElevation
+            ? THREE.MathUtils.clamp(pitchStep / dt, -1.2, 1.2) : 0;
+          this.canvas.style.cursor = 'grabbing';
+        }
+        drag.lastX = event.clientX;
+        drag.lastY = event.clientY;
+        drag.time = now;
+        return;
       }
+      // 手機手指不模擬 hover，避免滑動時反覆射線拾取與更新提示卡。
+      if (event.pointerType !== 'mouse' || this._dragPointer) return;
       const id = this._pick(event);
       this.canvas.style.cursor = id ? 'pointer' : '';
       const rect = this.canvas.getBoundingClientRect();
@@ -510,6 +547,7 @@ export class GardenScene {
     this.canvas.addEventListener('pointerdown', this._handleDown);
     this.canvas.addEventListener('pointerup', this._handleUp);
     this.canvas.addEventListener('pointercancel', this._handleUp);
+    this.canvas.addEventListener('lostpointercapture', this._handleUp);
     this.canvas.addEventListener('click', this._handleClick);
     this.canvas.addEventListener('pointermove', this._handleMove);
     this.canvas.addEventListener('pointerleave', this._handleLeave);
@@ -904,9 +942,19 @@ export class GardenScene {
     const focused = this.entries.get(this.focusedId);
     const dragDelta = Math.min(0.05, Math.max(0, elapsed - (this._cameraElapsed ?? elapsed)));
     this._cameraElapsed = elapsed;
-    if (!this._dragPointer) { this._userAngle += this._dragVelocity * dragDelta; this._dragVelocity *= Math.exp(-dragDelta * 4.2); if (Math.abs(this._dragVelocity) < 0.002) this._dragVelocity = 0; }
+    if (!this._dragPointer) {
+      const decay = Math.exp(-dragDelta * 4.2);
+      this._userAngle += this._dragVelocity * dragDelta;
+      const nextPitch = this._userElevation + this._verticalVelocity * dragDelta;
+      this._userElevation = THREE.MathUtils.clamp(nextPitch, -0.22, 0.44);
+      this._dragVelocity *= decay;
+      this._verticalVelocity = nextPitch === this._userElevation ? this._verticalVelocity * decay : 0;
+      if (Math.abs(this._dragVelocity) < 0.002) this._dragVelocity = 0;
+      if (Math.abs(this._verticalVelocity) < 0.002) this._verticalVelocity = 0;
+    }
     const angle = focused ? this._focusAngle : this.baseAngle + elapsed * 0.02 + this._userAngle;
-    const elevation = rig.elevation + Math.sin(elapsed * 0.11) * 0.012;
+    const elevation = THREE.MathUtils.clamp(rig.elevation + (focused ? 0 : this._userElevation)
+      + Math.sin(elapsed * 0.11) * 0.012, 0.15, 1.15);
     const distance = focused ? THREE.MathUtils.clamp(rig.distance * 0.55, 3.2, 7) : rig.distance;
     this._lookDesired.set(focused?.root.position.x ?? 0,
       focused ? Math.max(0.25, focused.height * 0.5) : rig.targetY,
@@ -915,7 +963,7 @@ export class GardenScene {
     this._cameraDesired.set(Math.cos(angle) * flat, Math.sin(elevation) * distance, Math.sin(angle) * flat)
       .add(this._lookDesired);
     const delta = Math.min(0.1, Math.max(0, elapsed - (this._lastElapsed ?? elapsed - 1 / 60)));
-    const damping = 1 - Math.exp(-delta * 8);
+    const damping = 1 - Math.exp(-delta * (this._dragPointer ? 20 : 8));
     this.camera.position.lerp(this._cameraDesired, damping);
     this._lookTarget.lerp(this._lookDesired, damping);
     this.camera.lookAt(this._lookTarget);
@@ -979,6 +1027,7 @@ export class GardenScene {
     this.canvas.removeEventListener('pointerdown', this._handleDown);
     this.canvas.removeEventListener('pointerup', this._handleUp);
     this.canvas.removeEventListener('pointercancel', this._handleUp);
+    this.canvas.removeEventListener('lostpointercapture', this._handleUp);
     this.canvas.removeEventListener('click', this._handleClick);
     this.canvas.removeEventListener('pointermove', this._handleMove);
     this.canvas.removeEventListener('pointerleave', this._handleLeave);

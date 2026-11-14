@@ -1693,7 +1693,7 @@ textarea {
 
 
 /* 手機互動：以 Pointer Events 支援花園水平旋轉與慣性滑動 */
-.wall__canvas { touch-action: none; }
+.wall__canvas { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .wall__gesture-hint {
   position: absolute; left: 50%; top: 43%;
   transform: translateX(-50%);
