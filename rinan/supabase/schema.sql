@@ -114,6 +114,22 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- social_daily：社群儀表板每日快照（Vercel Cron 每天寫入）
+-- Meta API 的粉絲數只有「現在」，每日指標也只回溯 30～93 天；每天存一份才看得到長期趨勢。
+-- ---------------------------------------------------------------------------
+create table if not exists public.social_daily (
+  day date not null,
+  platform text not null check (platform in ('facebook', 'instagram', 'plantings')),
+  followers integer,
+  metrics jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (day, platform)
+);
+
+comment on table public.social_daily is '社群儀表板每日快照（Vercel Cron 每天寫入）：FB／IG 粉絲數與每日觀看、觸及、互動，以及植生牆每日種植數；累積超過 Meta API 只給 30～93 天的歷史';
+comment on column public.social_daily.followers is '快照當下的粉絲總數；只有快照執行當天有值，補寫前一天時不覆蓋';
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security
 -- 前端 Wall 頁使用 anon key 直接讀取與訂閱 Realtime，只能讀到 approved（在牆上）的種植紀錄。
 -- 寫入、下架、visits 讀寫一律經由伺服器端 /api（service role key）處理，不對外公開。
@@ -122,6 +138,7 @@ alter table public.plantings enable row level security;
 alter table public.visits enable row level security;
 alter table public.line_users enable row level security;
 alter table public.kiosk_sessions enable row level security;
+alter table public.social_daily enable row level security;
 
 drop policy if exists "public can read approved plantings" on public.plantings;
 create policy "public can read approved plantings"
@@ -136,7 +153,7 @@ grant select (id, plant_type, display_name, message, status, created_at) on publ
 
 -- 不建立 anon insert/update policy：一律由伺服器端以 service role key 寫入，
 -- 這樣才能先驗證 LIFF token、過濾不雅字詞，再落地資料庫。
--- visits、line_users、kiosk_sessions 表不開放任何 anon 權限，僅 service role 可讀寫。
+-- visits、line_users、kiosk_sessions、social_daily 表不開放任何 anon 權限，僅 service role 可讀寫。
 
 -- ---------------------------------------------------------------------------
 -- Realtime：把 plantings 加進 supabase_realtime publication，投影牆才收得到即時新增。

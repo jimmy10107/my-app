@@ -42,6 +42,10 @@ export const env = {
   get metaAppSecret() {
     return read('META_APP_SECRET');
   },
+  // Vercel Cron 呼叫 /api/social/snapshot 時帶的密鑰（Vercel 會自動放進 Authorization header）
+  get cronSecret() {
+    return read('CRON_SECRET');
+  },
   get metaGraphVersion() {
     return read('META_GRAPH_VERSION') || 'v25.0';
   },

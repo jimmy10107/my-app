@@ -19,13 +19,14 @@ rinan/
   docs/SOCIAL_INSIGHTS.md   後台社群洞察（FB／IG）的設定、指標說明與判讀方式
 ```
 
-## 四個網頁介面
+## 五個網頁介面
 
 | 頁面 | 路徑 | 用途 |
 | --- | --- | --- |
 | 互動頁 Play | `/#/play` | 觀眾掃 QR 進入，LINE 登入、選植物、留言、種下，看自己的植物發芽 |
 | 現場平板 Kiosk | `/#/kiosk` | 沒有 LINE 也能玩：固定在現場的平板，自己打暱稱 |
 | 投影牆 Wall | `/#/wall` | 投影機全螢幕：3D 花園、天空文字雲、掃碼 QR、底部最新留言 |
+| 社群儀表板 | `/#/social` | 全螢幕 FB／IG 數據儀表板，每 15 分鐘自動更新，含每日快照的長期趨勢（後台密碼登入） |
 | 後台 Admin | `/#/admin` | 參加連結與 QR 下載、統計、最新種下清單（一鍵下架／恢復）、CSV 匯出；「社群洞察」分頁分析 FB／IG 數據並產生行銷策略 |
 
 ## 資料如何流動
@@ -51,6 +52,7 @@ rinan/
 | `ADMIN_JWT_SECRET` | API | 自訂一長串隨機英數字 |
 | `VISIT_DEVICE_SECRET` | API | 選配，人流感測裝置的共用密鑰；沒有裝置就不要設 |
 | `META_PAGE_ID`、`META_PAGE_ACCESS_TOKEN` | API | 選配，後台「社群洞察」用的粉專 ID 與粉專權杖；另可設 `META_APP_SECRET`、`META_IG_USER_ID`、`META_GRAPH_VERSION`，取得方式見 [docs/SOCIAL_INSIGHTS.md](docs/SOCIAL_INSIGHTS.md) |
+| `CRON_SECRET` | API | 選配，社群儀表板每日快照排程（Vercel Cron）的密鑰；沒設定就不跑每日快照 |
 
 `VITE_` 開頭的會被打包進網頁（只能放可以公開的資訊）；改了 `VITE_` 變數要重新部署才會生效。舊的 `VITE_API_BASE_URL` 已經用不到，可以刪掉。
 

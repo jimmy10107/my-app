@@ -9,7 +9,7 @@ const TOKEN_KEY = 'rinan_admin_token';
 const TAB_KEY = 'rinan_admin_tab';
 const REFRESH_MS = 15000;
 
-function readToken() {
+export function readToken() {
   try {
     return localStorage.getItem(TOKEN_KEY);
   } catch {
@@ -25,7 +25,7 @@ function readTab() {
   }
 }
 
-function writeToken(token) {
+export function writeToken(token) {
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
@@ -59,7 +59,7 @@ export function AdminPage() {
   );
 }
 
-function LoginForm({ onLoggedIn }) {
+export function LoginForm({ onLoggedIn }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -267,7 +267,15 @@ function Dashboard({ token, onLogout }) {
       </nav>
 
       {tab === 'social' ? (
-        <SocialInsights token={token} onAuthError={handleError} />
+        <>
+          <div className="social__open">
+            <a className="admin-join__button" href="#/social" target="_blank" rel="noreferrer">
+              開啟全螢幕儀表板
+            </a>
+            <span>適合放在辦公室螢幕或電視上，每 15 分鐘自動更新</span>
+          </div>
+          <SocialInsights token={token} onAuthError={handleError} />
+        </>
       ) : (
         <>
           <JoinLinkPanel />

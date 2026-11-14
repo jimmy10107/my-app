@@ -49,6 +49,8 @@ export const api = {
   socialReport: (token, { days = 28, refresh = false } = {}) =>
     request(`/api/social/report?days=${days}${refresh ? '&refresh=1' : ''}`, { token }),
 
+  socialHistory: (token, days = 90) => request(`/api/social/history?days=${days}`, { token }),
+
   createKioskSession: () => request('/api/kiosk/session', { method: 'POST' }),
 
   // CSV 下載不是 JSON，走獨立的 fetch + blob，觸發瀏覽器另存新檔。

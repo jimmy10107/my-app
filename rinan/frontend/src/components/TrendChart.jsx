@@ -13,24 +13,37 @@ function niceMax(value) {
   return step * exp;
 }
 
-const compact = (v) =>
-  v >= 10000 ? `${(v / 10000).toFixed(v >= 100000 ? 0 : 1)}萬` : Math.round(v).toLocaleString('zh-TW');
+const compact = (v) => {
+  if (v >= 10000) return `${(v / 10000).toFixed(v >= 100000 ? 0 : 1)}萬`;
+  if (v < 10 && !Number.isInteger(v)) return v.toFixed(1);
+  return Math.round(v).toLocaleString('zh-TW');
+};
 const shortDate = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
-export function TrendChart({ title, data, color, unit = '' }) {
+// fromZero=false：粉絲數這類大數字的小幅成長，從 0 起畫會變成一條平線，改用資料範圍當 Y 軸。
+// summary：'total' 顯示期間合計，'last' 顯示最新一天的數字（例如粉絲總數）。
+export function TrendChart({ title, data, color, unit = '', fromZero = true, summary = 'total' }) {
   const svgRef = useRef(null);
   const [hover, setHover] = useState(null);
 
-  const { points, max, path, total, hasData } = useMemo(() => {
+  const { points, min, max, path, total, last, hasData } = useMemo(() => {
     const values = data.map((d) => d.value).filter((v) => v != null);
-    const max = niceMax(Math.max(0, ...values));
+    let min = 0;
+    let max = niceMax(Math.max(0, ...values));
+    if (!fromZero && values.length > 0) {
+      const lo = Math.min(...values);
+      const hi = Math.max(...values);
+      const pad = Math.max(1, (hi - lo) * 0.25);
+      min = Math.max(0, Math.floor(lo - pad));
+      max = Math.ceil(hi + pad);
+    }
     const innerW = W - PAD.left - PAD.right;
     const innerH = H - PAD.top - PAD.bottom;
     const step = data.length > 1 ? innerW / (data.length - 1) : 0;
     const points = data.map((d, i) => ({
       ...d,
       x: PAD.left + i * step,
-      y: d.value == null ? null : PAD.top + innerH - (d.value / max) * innerH,
+      y: d.value == null ? null : PAD.top + innerH - ((d.value - min) / (max - min)) * innerH,
     }));
     // 沒有數值的日子斷開線段，不畫成 0
     let path = '';
@@ -43,8 +56,17 @@ export function TrendChart({ title, data, color, unit = '' }) {
       path += `${pen ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`;
       pen = true;
     }
-    return { points, max, path, total: values.reduce((a, b) => a + b, 0), hasData: values.length > 0 };
-  }, [data]);
+    const lastPoint = [...points].reverse().find((p) => p.y != null) || null;
+    return {
+      points,
+      min,
+      max,
+      path,
+      total: values.reduce((a, b) => a + b, 0),
+      last: lastPoint,
+      hasData: values.length > 0,
+    };
+  }, [data, fromZero]);
 
   function handleMove(event) {
     const svg = svgRef.current;
@@ -58,7 +80,9 @@ export function TrendChart({ title, data, color, unit = '' }) {
     setHover(nearest);
   }
 
-  const ticks = [0, max / 2, max];
+  // 小範圍的整數（例如每日 0～1 篇）不畫 0.5 這種不存在的刻度
+  const integerData = data.every((d) => d.value == null || Number.isInteger(d.value));
+  const ticks = integerData && max - min < 4 ? [min, max] : [min, (min + max) / 2, max];
   const xLabels =
     points.length > 2 ? [0, Math.floor((points.length - 1) / 2), points.length - 1] : points.map((_, i) => i);
   const hp = hover == null ? null : points[hover];
@@ -68,7 +92,8 @@ export function TrendChart({ title, data, color, unit = '' }) {
       <figcaption className="trend__head">
         <span className="trend__title">{title}</span>
         <span className="trend__total">
-          合計 {hasData ? Math.round(total).toLocaleString('zh-TW') : '—'}
+          {summary === 'last' ? '最新 ' : '合計 '}
+          {hasData ? Math.round(summary === 'last' ? last.value : total).toLocaleString('zh-TW') : '—'}
           {unit}
         </span>
       </figcaption>
@@ -84,7 +109,7 @@ export function TrendChart({ title, data, color, unit = '' }) {
             onPointerLeave={() => setHover(null)}
           >
             {ticks.map((t) => {
-              const y = PAD.top + (H - PAD.top - PAD.bottom) * (1 - t / max);
+              const y = PAD.top + (H - PAD.top - PAD.bottom) * (1 - (t - min) / (max - min));
               return (
                 <g key={t}>
                   <line
@@ -112,6 +137,7 @@ export function TrendChart({ title, data, color, unit = '' }) {
               </text>
             ))}
             <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            {last && !hp && <circle cx={last.x} cy={last.y} r="3.5" fill={color} stroke="#fff" strokeWidth="1.5" />}
             {hp && (
               <g>
                 <line x1={hp.x} x2={hp.x} y1={PAD.top} y2={H - PAD.bottom} className="trend__crosshair" />

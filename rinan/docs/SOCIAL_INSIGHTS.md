@@ -17,8 +17,28 @@
 | `META_APP_SECRET` | 建議 | Meta App 的 App Secret，用來附上 `appsecret_proof`，權杖外洩也無法被單獨使用 |
 | `META_IG_USER_ID` | 否 | 留空會自動抓粉專連結的 IG 專業帳號；只有要指定別的帳號才填 |
 | `META_GRAPH_VERSION` | 否 | 預設 `v25.0`；Meta 停用舊版本時改這裡即可 |
+| `CRON_SECRET` | 建議 | 每日快照排程的密鑰（自訂一長串隨機英數字）。Vercel Cron 會自動帶上；沒設定時每日快照不會執行 |
 
 填好後重新部署，打開 `https://你的網域/api/health`，回應裡的 `"social": "configured"` 就代表變數有讀到。
+
+## 持續更新的儀表板
+
+- **全螢幕儀表板**：`https://你的網域/#/social`（後台「社群洞察」分頁也有「開啟全螢幕儀表板」按鈕），用後台密碼登入。
+  適合放在辦公室螢幕或電視上長時間開著，右上角顯示時間，內容與後台分頁相同。
+- **自動更新**：儀表板與後台分頁每 15 分鐘自動重抓一次，畫面上會顯示「自動更新中，下次 HH:MM」。
+  瀏覽器分頁在背景時暫停，切回來會立刻補抓。伺服器端也快取 15 分鐘，所以不會多打 Meta API。
+- **長期趨勢（每日快照）**：Meta 只給「現在」的粉絲數，每日指標也只能回溯 30～93 天。
+  系統把每天的數字存進 Supabase 的 `social_daily` 表，儀表板的「長期趨勢」區塊可以看 30 天、90 天、180 天或一年的粉絲成長、每日觀看與觸及、種植數、發文數。
+  - 每次打開報表，會把報表期間（最多 28 天）的每日數字補進去，所以第一次打開就有將近一個月的歷史。
+  - Vercel Cron 每天台灣時間凌晨 2 點（`vercel.json` 的 `crons`）再存一次，並重寫最近 7 天的數字（Meta 常在隔天才補齊前一天的資料）。
+  - 粉絲數一天只記一筆（排程執行當下的總數），粉絲曲線要累積幾天才看得出變化。
+- **登入時效**：後台登入 12 小時後過期，儀表板會回到登入畫面，重新輸入密碼即可。
+
+### 啟用每日快照（一次性）
+
+1. Supabase → SQL Editor 執行 `rinan/supabase/migrations/2026-11-14-social-daily.sql`（全新專案跑 `schema.sql` 就已包含）。
+2. Vercel → Settings → Environment Variables 新增 `CRON_SECRET`（自訂一長串隨機英數字），重新部署。
+3. Vercel → 專案 → Settings → Cron Jobs 會看到 `/api/social/snapshot`，可以按「Run」先手動跑一次，確認回應 `"ok": true`。
 
 ## 事前確認
 
@@ -93,6 +113,7 @@ Meta 這兩年陸續汰換洞察指標，例如 2025 年 11 月起粉專 `impres
 - FB「觸及人數」是每日不重複人數的加總，跨日會重複計算同一個人，適合看趨勢、不適合當絕對人數。
 - 貼文的觸及等洞察只抓本期貼文；上一期貼文只用來計算發文頻率。
 - 報表在伺服器上快取 15 分鐘；按「重新抓取」會略過快取。
+- 每日快照只存數字（粉絲數、每日觀看／觸及／互動、發文數、種植數），不存貼文內容；`social_daily` 不開放公開金鑰讀取。
 
 ## 程式位置
 
@@ -101,7 +122,10 @@ rinan/frontend/
   server/lib/meta.js            Graph API 用戶端（appsecret_proof、分頁、指標失效容錯）
   server/lib/socialCollect.js   抓 FB／IG／植生牆資料，整理成本期 vs 上一期
   server/lib/socialAnalysis.js  洞察與策略規則（純函式）、Markdown 報告
-  server/routes/social.js       GET /api/social/report?days=7|14|28（需後台登入）
-  src/components/SocialInsights.jsx、TrendChart.jsx   後台分頁畫面
-  tests/socialInsights.test.js  用模擬的 Graph API 回應測整條流程
+  server/lib/socialSnapshot.js  每日快照寫入 social_daily、讀回歷史
+  server/routes/social.js       GET /api/social/report?days=7|14|28、/api/social/history（需後台登入）
+                                GET /api/social/snapshot（Vercel Cron，需 CRON_SECRET）
+  src/components/SocialInsights.jsx、SocialHistory.jsx、TrendChart.jsx   儀表板畫面
+  src/pages/SocialDashboardPage.jsx   全螢幕儀表板（/#/social）
+  tests/socialInsights.test.js、socialSnapshot.test.js  用模擬的 Graph API 回應測整條流程
 ```

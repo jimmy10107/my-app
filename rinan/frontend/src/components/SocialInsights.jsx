@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { TrendChart } from './TrendChart.jsx';
+import { SocialHistory } from './SocialHistory.jsx';
 
 // 後台「社群洞察」分頁：FB 粉專＋IG 專業帳號的本期 vs 上一期、每日趨勢、洞察、行銷策略。
 // 所有分析都在 /api/social/report 算好，這裡只負責呈現。
@@ -38,32 +39,63 @@ function readDays() {
   }
 }
 
-export function SocialInsights({ token, onAuthError }) {
+const AUTO_REFRESH_MS = 15 * 60 * 1000;
+const clock = (ms) =>
+  new Date(ms).toLocaleTimeString('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+// 儀表板模式：每 15 分鐘自動重抓（伺服器端也快取 15 分鐘，不會多打 Meta）；分頁在背景時暫停，回到前景立刻補抓。
+export function SocialInsights({ token, onAuthError, autoRefreshMs = AUTO_REFRESH_MS }) {
   const [days, setDays] = useState(readDays);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [nextAt, setNextAt] = useState(null);
+  const [historyKey, setHistoryKey] = useState(0);
 
   const load = useCallback(
     async (refresh = false) => {
       setLoading(true);
       setError(null);
       try {
-        setReport(await api.socialReport(token, { days, refresh }));
+        const next = await api.socialReport(token, { days, refresh });
+        setReport(next);
+        if (next.cached === false) setHistoryKey((k) => k + 1);
       } catch (err) {
         if (err.status === 401) onAuthError(err);
         else setError(err.message);
       } finally {
         setLoading(false);
+        setNextAt(Date.now() + autoRefreshMs);
       }
     },
-    [token, days, onAuthError]
+    [token, days, onAuthError, autoRefreshMs]
   );
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!autoRefreshMs) return undefined;
+    let last = Date.now();
+    const tick = () => {
+      if (document.hidden || Date.now() - last < autoRefreshMs) return;
+      last = Date.now();
+      load();
+    };
+    const interval = setInterval(tick, 30 * 1000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [load, autoRefreshMs]);
 
   function pickDays(d) {
     setDays(d);
@@ -121,7 +153,13 @@ export function SocialInsights({ token, onAuthError }) {
           本期 {report.range.current.start} ～ {report.range.current.end}，對照上一期 {report.range.previous.start} ～{' '}
           {report.range.previous.end}（不含今天）。資料時間{' '}
           {new Date(report.generatedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}
-          {report.cached && '（快取，按「重新抓取」更新）'}
+          {report.cached && '（伺服器快取）'}
+          {autoRefreshMs > 0 && nextAt && (
+            <span className="social__live">
+              <span className="social__live-dot" aria-hidden="true" />
+              自動更新中，下次 {clock(nextAt)}
+            </span>
+          )}
         </p>
       )}
 
@@ -174,6 +212,8 @@ export function SocialInsights({ token, onAuthError }) {
               />
             )}
           </div>
+
+          <SocialHistory token={token} onAuthError={onAuthError} reloadKey={historyKey} />
 
           <h2 className="admin-page__section-title">洞察</h2>
           <ul className="social__insights">
